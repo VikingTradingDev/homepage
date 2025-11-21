@@ -1,0 +1,916 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VikingTrading</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/simplex-noise/2.4.0/simplex-noise.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #050507;
+            --text-primary: #f5f5f7;
+            --text-secondary: #aaaaaf;
+            --accent: #2997ff;
+            --code-bg: rgba(20, 20, 23, 0.6);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        /* --- Intro Overlay --- */
+        #intro-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100vh;
+            background-color: #000; z-index: 9999;
+            display: flex; justify-content: center; align-items: center;
+        }
+
+        .intro-logo {
+            font-size: clamp(40px, 5vw, 80px); font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em;
+            background: linear-gradient(90deg, #333 0%, #fff 50%, #333 100%);
+            background-size: 200% auto; background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            animation: shine 3s linear infinite; opacity: 0; 
+        }
+
+        @keyframes shine { to { background-position: 200% center; } }
+
+        /* --- Canvas --- */
+        #canvas-container {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100vh; z-index: 1;
+            opacity: 0; transition: opacity 2s ease; pointer-events: none;
+        }
+
+        /* --- Nav (Updated) --- */
+        nav {
+            position: fixed; top: 0; left: 0; width: 100%; padding: 24px 40px;
+            display: flex; justify-content: space-between; align-items: center;
+            z-index: 100; 
+            background: rgba(5, 5, 7, 0.3);
+            backdrop-filter: blur(5px);
+            opacity: 0; 
+        }
+
+        .logo {
+            font-size: 22px; font-weight: 600; letter-spacing: -0.01em; color: #fff; cursor: pointer;
+        }
+
+        .nav-links {
+            display: flex; gap: 30px;
+        }
+
+        .nav-link {
+            color: #fff; /* 默认为白色 */
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 500;
+            transition: color 0.3s ease;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .nav-link:hover { color: var(--accent); } /* 悬停变蓝 */
+        
+        /* 激活状态样式 */
+        .nav-link.active {
+            color: var(--accent); /* 激活变蓝 */
+        }
+
+        /* --- Main Content --- */
+        main { position: relative; z-index: 10; }
+
+        section {
+            min-height: 100vh; width: 100%;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            text-align: center; padding: 100px 20px;
+            opacity: 0; will-change: opacity, transform; position: relative;
+        }
+
+        .hero-text {
+            max-width: 1000px; margin: 0 auto; position: relative; z-index: 2; padding: 60px;
+            border-radius: 24px; transition: background 0.3s ease;
+        }
+
+        .glass-text {
+            background: radial-gradient(ellipse 120% 100% at center, rgba(10, 10, 15, 0.25) 0%, rgba(10, 10, 15, 0.05) 50%, transparent 100%);
+            backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px);
+            border: none; box-shadow: none;
+        }
+        
+        #section1 .hero-text { transform: translateY(-15vh); }
+
+        h1 {
+            font-size: clamp(48px, 8vw, 96px); font-weight: 700; line-height: 1.05; letter-spacing: -0.02em;
+            margin-bottom: 32px;
+            background: linear-gradient(180deg, #ffffff 0%, #b0b0b0 100%);
+            background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            transform: translateY(40px);
+        }
+        
+        #section4 h1 { font-size: clamp(40px, 6vw, 70px); }
+
+        p {
+            font-size: clamp(22px, 3vw, 32px); line-height: 1.4; font-weight: 400;
+            color: var(--text-secondary); max-width: 800px; margin: 0 auto;
+            transform: translateY(40px);
+        }
+
+        .highlight { color: var(--text-primary); font-weight: 500; text-shadow: 0 0 20px rgba(255,255,255,0.3); }
+
+        /* --- Code Snippet Decoration (Section 3) --- */
+        .code-decoration {
+            position: absolute; background: var(--code-bg);
+            backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 24px;
+            text-align: left; font-family: "SF Mono", "Menlo", "Monaco", "Courier New", monospace;
+            font-size: 12px; line-height: 1.5; color: #d4d4d4;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4); opacity: 0; width: auto; max-width: 400px; z-index: 1;
+        }
+        .code-decoration::before {
+            content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 2px;
+            background: linear-gradient(90deg, transparent, #2997ff, transparent); opacity: 0.5;
+        }
+        .code-tl { left: 8%; top: 16%; transform: translateY(40px) rotate(-4deg) scale(0.85); }
+        .code-tr { right: 8%; top: 19%; transform: translateY(40px) rotate(3deg) scale(0.85); }
+        .code-bl { left: 10%; bottom: 14%; transform: translateY(40px) rotate(2deg) scale(0.85); }
+        .code-br { right: 10%; bottom: 12%; transform: translateY(40px) rotate(-5deg) scale(0.85); }
+        .code-line { display: block; }
+        .c-keyword { color: #c586c0; } .c-func { color: #dcdcaa; } .c-str { color: #ce9178; } 
+        .c-param { color: #9cdcfe; } .c-const { color: #4fc1ff; } .c-bool { color: #569cd6; }
+
+        /* --- Scroll Indicator --- */
+        .scroll-indicator {
+            position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%);
+            width: 1px; height: 80px; background: linear-gradient(to bottom, rgba(255,255,255,0.5), transparent); opacity: 0;
+        }
+
+        /* --- Job Section Styles --- */
+        .jobs-container {
+            width: 100%; max-width: 900px; margin-top: 40px;
+            display: flex; flex-direction: column; gap: 20px;
+            transform: translateY(40px);
+        }
+
+        .job-card {
+            background: rgba(30, 30, 35, 0.5);
+            backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px; overflow: hidden; cursor: pointer;
+            transition: all 0.3s ease; text-align: left;
+        }
+
+        .job-card:hover {
+            background: rgba(41, 151, 255, 0.1); border-color: rgba(41, 151, 255, 0.3);
+        }
+
+        .job-card.active {
+            background: rgba(20, 20, 25, 0.9); border-color: var(--accent);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+
+        .job-header {
+            padding: 25px 30px; display: flex; justify-content: space-between; align-items: center;
+        }
+
+        .job-title {
+            font-size: 18px; font-weight: 600; color: #fff; display: flex; align-items: center; gap: 12px;
+        }
+
+        .job-tag {
+            font-size: 11px; padding: 4px 8px; border-radius: 4px;
+            background: rgba(41, 151, 255, 0.2); color: #2997ff;
+            text-transform: uppercase; letter-spacing: 0.5px;
+        }
+
+        .job-arrow { font-size: 20px; color: #666; transition: transform 0.3s; }
+        .job-card.active .job-arrow { transform: rotate(45deg); color: var(--accent); }
+
+        .job-content {
+            height: 0; overflow: hidden; transition: height 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            background: rgba(0, 0, 0, 0.2);
+        }
+
+        .job-content-inner {
+            padding: 0 30px 30px 30px; color: #ccc; font-size: 15px; line-height: 1.8;
+        }
+
+        .jd-section { margin-top: 20px; }
+        .jd-title {
+            color: var(--accent); font-size: 13px; font-weight: 700;
+            text-transform: uppercase; letter-spacing: 1px; display: block; margin-bottom: 8px;
+        }
+        .jd-list { list-style: none; padding-left: 5px; }
+        .jd-list li { position: relative; padding-left: 15px; margin-bottom: 5px; }
+        .jd-list li::before { content: '›'; position: absolute; left: 0; color: #666; font-weight: bold; }
+
+        /* --- Footer (Harmonized) --- */
+        footer {
+            height: auto; 
+            padding: 100px 40px 60px; 
+            display: flex; flex-direction: column; justify-content: flex-end; align-items: center;
+            background: linear-gradient(to top, #000 40%, transparent);
+            border-top: 1px solid rgba(255,255,255,0.08);
+            position: relative;
+        }
+        
+        .footer-logo { 
+            font-size: 28px;
+            font-weight: 700; 
+            margin-bottom: 40px; 
+            background: linear-gradient(135deg, #ffffff 0%, #666 100%);
+            background-clip: text; 
+            -webkit-background-clip: text; 
+            -webkit-text-fill-color: transparent;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+        
+        .contact-info { 
+            margin-bottom: 35px; 
+            display: flex;
+            gap: 50px;
+            align-items: center;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        
+        .contact-info p {
+            font-size: 13px;
+            color: rgba(170, 170, 175, 0.9);
+            line-height: 1.6;
+            letter-spacing: 0.8px;
+            margin: 0;
+            font-weight: 400;
+            transform: none;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .contact-info p::before {
+            content: '';
+            width: 3px;
+            height: 3px;
+            background: var(--accent);
+            border-radius: 50%;
+            opacity: 0.6;
+        }
+        
+        .contact-info a { 
+            color: rgba(245, 245, 247, 0.95);
+            text-decoration: none; 
+            border-bottom: 1px solid transparent; 
+            transition: all 0.3s ease;
+            font-weight: 500;
+        }
+        
+        .contact-info a:hover { 
+            color: var(--accent);
+            border-bottom: 1px solid var(--accent); 
+        }
+        
+        .footer-divider {
+            width: 60px;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(41, 151, 255, 0.5), transparent);
+            margin-bottom: 25px;
+        }
+        
+        .footer-copy { 
+            font-size: 11px; 
+            color: rgba(85, 85, 85, 0.8); 
+            letter-spacing: 1px;
+            font-weight: 300;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 0px; background: transparent; }
+
+        /* Mobile tweaks */
+        @media (max-width: 768px) {
+            .nav-links { display: none; } 
+        }
+    </style>
+</head>
+<body>
+    <div id="intro-overlay">
+        <div class="intro-logo">VikingTrading</div>
+    </div>
+
+    <div id="canvas-container"></div>
+
+    <nav>
+        <div class="logo" onclick="window.scrollTo(0,0)">VikingTrading</div>
+        <div class="nav-links">
+            <a href="#section1" class="nav-link">理念</a>
+            <a href="#section2" class="nav-link">业务</a>
+            <a href="#section3" class="nav-link">技术</a>
+            <a href="#section4" class="nav-link">加入我们</a>
+        </div>
+    </nav>
+
+    <main>
+        <section id="section1">
+            <div class="hero-text">
+                <h1>流动性提供商</h1>
+                <p>我们在<span class="highlight">时间与空间</span>中搬运流动性，<br>监测不同场所的流动性洼地，<br>平抑市场中突如其来的需求。</p>
+            </div>
+            <div class="scroll-indicator"></div>
+        </section>
+
+        <section id="section2">
+            <div class="hero-text">
+                <h1>纯粹的交易艺术</h1>
+                <p>用技术和策略在市场上交易。<br>我们的生意完全依靠<span class="highlight">交易盈利</span>，<br>无甲方、无乙方。</p>
+            </div>
+        </section>
+
+        <section id="section3">
+            <div class="hero-text">
+                <h1>认知的边界</h1>
+                <p>我们珍视深刻的市场直觉和 <span class="highlight">Market Microstructure</span> 的准确理解。<br>用数据、直觉和纸笔，<br>拓展我们认知和策略的边界。</p>
+            </div>
+
+            <div class="code-decoration code-tl">
+                <span class="code-line"><span class="c-param">trades_df</span> = <span class="c-param">vk</span>.<span class="c-func">get_data</span>(</span>
+                <span class="code-line">&nbsp;&nbsp;&nbsp;&nbsp;<span class="c-param">exchange</span>=<span class="c-str">"kraken"</span>,</span>
+                <span class="code-line">&nbsp;&nbsp;&nbsp;&nbsp;<span class="c-param">currency_pair</span>=<span class="c-str">"btcusd"</span>,</span>
+                <span class="code-line">&nbsp;&nbsp;&nbsp;&nbsp;<span class="c-param">data_type</span>=<span class="c-str">"trades"</span>,</span>
+                <span class="code-line">&nbsp;&nbsp;&nbsp;&nbsp;<span class="c-param">start_date</span>=<span class="c-str">"2024-08-22"</span>,</span>
+                <span class="code-line">&nbsp;&nbsp;&nbsp;&nbsp;<span class="c-param">end_date</span>=<span class="c-str">"2025-03-17"</span></span>
+                <span class="code-line">)</span>
+            </div>
+            <div class="code-decoration code-tr">
+                <span class="code-line"><span class="c-param">mif</span> = <span class="c-param">vk</span>.<span class="c-func">MIFTradesDataImporter</span>(</span>
+                <span class="code-line">&nbsp;&nbsp;&nbsp;&nbsp;<span class="c-param">exchange</span>=<span class="c-str">"binance_future"</span>,</span>
+                <span class="code-line">&nbsp;&nbsp;&nbsp;&nbsp;<span class="c-param">currency_pair</span>=<span class="c-str">"btc-usdt"</span></span>
+                <span class="code-line">)</span>
+                <br>
+                <span class="code-line"><span class="c-param">impact_df</span> = <span class="c-param">mif</span>.<span class="c-func">get_data</span>(</span>
+                <span class="code-line">&nbsp;&nbsp;&nbsp;&nbsp;<span class="c-param">date</span>=<span class="c-str">"2024-01-15"</span>,</span>
+                <span class="code-line">&nbsp;&nbsp;&nbsp;&nbsp;<span class="c-param">use_fp</span>=<span class="c-bool">True</span></span>
+                <span class="code-line">)</span>
+            </div>
+            <div class="code-decoration code-bl">
+                <span class="code-line"><span class="c-param">vk</span>.<span class="c-func">plot_event_study</span>(</span>
+                <span class="code-line">&nbsp;&nbsp;&nbsp;&nbsp;<span class="c-param">trades_df</span>=<span class="c-param">trades_df</span>,</span>
+                <span class="code-line">&nbsp;&nbsp;&nbsp;&nbsp;<span class="c-param">return_cols</span>=<span class="c-param">return_cols</span>,</span>
+                <span class="code-line">&nbsp;&nbsp;&nbsp;&nbsp;<span class="c-param">flag_col</span>=<span class="c-str">'side'</span>,</span>
+                <span class="code-line">&nbsp;&nbsp;&nbsp;&nbsp;<span class="c-param">title</span>=<span class="c-str">"Large Trade Impact"</span></span>
+                <span class="code-line">)</span>
+            </div>
+            <div class="code-decoration code-br">
+                <span class="code-line"><span class="c-param">config</span> = <span class="c-func">prepare_config</span>(</span>
+                <span class="code-line">&nbsp;&nbsp;&nbsp;&nbsp;<span class="c-param">base_config</span>=<span class="c-str">'kk50_baseline'</span>,</span>
+                <span class="code-line">&nbsp;&nbsp;&nbsp;&nbsp;<span class="c-param">experiment_name</span>=<span class="c-str">'new_backtest'</span>,</span>
+                <span class="code-line">&nbsp;&nbsp;&nbsp;&nbsp;<span class="c-param">user_name</span>=<span class="c-str">'viking'</span>,</span>
+                <span class="code-line">&nbsp;&nbsp;&nbsp;&nbsp;<span class="c-param">start_date</span>=<span class="c-str">'2023-01-01'</span>,</span>
+                <span class="code-line">&nbsp;&nbsp;&nbsp;&nbsp;<span class="c-param">end_date</span>=<span class="c-str">'2024-12-31'</span></span>
+                <span class="code-line">)</span>
+                <br>
+                <span class="code-line"><span class="c-param">result</span> = <span class="c-func">run_backtest</span>(<span class="c-param">config</span>)</span>
+            </div>
+        </section>
+
+        <section id="section4">
+            <div class="hero-text">
+                <h1>加入我们</h1>
+                <p>与顶尖团队并肩，<br>用代码挑战金融市场的极限。</p>
+            </div>
+
+            <div class="jobs-container">
+                <div class="job-card" onclick="toggleJob(this)">
+                    <div class="job-header">
+                        <div class="job-title">量化研究员 <span class="job-tag">全职</span></div>
+                        <div class="job-arrow">+</div>
+                    </div>
+                    <div class="job-content">
+                        <div class="job-content-inner">
+                            <div class="jd-section"><span class="jd-title">工作内容</span><ul class="jd-list"><li>与团队协作，通过对市场数据进行分析，探索市场规律</li><li>设计相应高频做市策略，通过回测与实盘反馈进行优化</li></ul></div>
+                            <div class="jd-section"><span class="jd-title">硬性要求</span><ul class="jd-list"><li>国内外知名院校理工专业学生，成绩优异</li></ul></div>
+                            <div class="jd-section"><span class="jd-title">基本要求</span><ul class="jd-list"><li>优秀的概率统计能力，和扎实的数学功底</li><li>熟练使用Python，良好的编码习惯</li></ul></div>
+                            <div class="jd-section"><span class="jd-title">加分项</span><ul class="jd-list"><li>统计/计算机相关博士</li><li>有高频量化相关经验</li><li>机器学习或者编程竞赛获奖</li></ul></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="job-card" onclick="toggleJob(this)">
+                    <div class="job-header">
+                        <div class="job-title">量化工程师 <span class="job-tag">全职</span></div>
+                        <div class="job-arrow">+</div>
+                    </div>
+                    <div class="job-content">
+                        <div class="job-content-inner">
+                            <div class="jd-section"><span class="jd-title">工作内容</span><ul class="jd-list"><li>设计开发高吞吐，低延迟的弹性可伸缩的内部量化交易系统，持续迭代</li><li>建立量化研究的基础架构（数据存储/处理/可视化、自动化部署、回测系统等）</li><li>协助策略研发团队开发相应专属工具</li></ul></div>
+                            <div class="jd-section"><span class="jd-title">硬性要求</span><ul class="jd-list"><li>国内外知名院校计算机专业学生</li></ul></div>
+                            <div class="jd-section"><span class="jd-title">基本要求</span><ul class="jd-list"><li>扎实的计算机基础，熟悉常用数据结构、算法和设计模式</li><li>熟练使用Python，良好的编码习惯和设计能力，具有强烈的责任心</li><li>有相关的工作/实习经验</li></ul></div>
+                            <div class="jd-section"><span class="jd-title">加分项</span><ul class="jd-list"><li>机器学习编程竞赛获奖</li><li>对主流开源软件有深入了解并有贡献</li><li>有个人github账户，开源作品或者技术blog</li><li>具有自我驱动能力，能推动系统改进方案落地</li></ul></div>
+                        </div>
+                    </div>
+                </div>
+
+                 <div class="job-card" onclick="toggleJob(this)">
+                    <div class="job-header">
+                        <div class="job-title">量化研究员 <span class="job-tag">实习</span></div>
+                        <div class="job-arrow">+</div>
+                    </div>
+                    <div class="job-content">
+                        <div class="job-content-inner">
+                            <div class="jd-section"><span class="jd-title">工作内容</span><ul class="jd-list"><li>与团队协作，通过对市场数据进行分析，探索市场规律</li><li>设计相应高频做市策略，通过回测与实盘反馈进行优化</li></ul></div>
+                            <div class="jd-section"><span class="jd-title">硬性要求</span><ul class="jd-list"><li>国内外知名院校理工专业学生</li><li>至少线下实习3个月，每周4天，未来有入职意向</li></ul></div>
+                            <div class="jd-section"><span class="jd-title">基本要求</span><ul class="jd-list"><li>优秀的概率统计能力，和扎实的数学功底</li><li>熟练使用Python，良好的编码习惯</li></ul></div>
+                            <div class="jd-section"><span class="jd-title">加分项</span><ul class="jd-list"><li>统计/计算机相关博士</li><li>有高频量化相关的实习经验</li><li>机器学习或者编程竞赛获奖</li></ul></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="job-card" onclick="toggleJob(this)">
+                    <div class="job-header">
+                        <div class="job-title">量化工程师 <span class="job-tag">实习</span></div>
+                        <div class="job-arrow">+</div>
+                    </div>
+                    <div class="job-content">
+                        <div class="job-content-inner">
+                            <div class="jd-section"><span class="jd-title">工作内容</span><ul class="jd-list"><li>设计开发高吞吐，低延迟的弹性可伸缩的内部量化交易系统</li><li>建立量化研究的基础架构（数据处理、运维工具、回测系统等）</li><li>协助策略研发团队开发相应专属工具</li></ul></div>
+                            <div class="jd-section"><span class="jd-title">硬性要求</span><ul class="jd-list"><li>国内外知名院校计算机专业学生</li><li>至少线下实习3个月，每周4天，临近毕业且有入职意向</li></ul></div>
+                            <div class="jd-section"><span class="jd-title">基本要求</span><ul class="jd-list"><li>扎实的计算机基础，熟悉常用数据结构、算法和设计模式</li><li>熟练使用Python，具有良好的编码习惯，优秀的设计能力和代码品味</li><li>有相关的工作/实习经验</li></ul></div>
+                            <div class="jd-section"><span class="jd-title">加分项</span><ul class="jd-list"><li>机器学习编程竞赛获奖</li><li>对主流开源软件有深入了解并有贡献</li><li>有个人github账户，开源作品或者技术blog</li><li>具有自我驱动能力，能推动系统改进方案落地</li></ul></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <footer>
+            <div class="footer-logo">VikingTrading</div>
+            <div class="footer-divider"></div>
+            <div class="contact-info">
+                <p><a href="mailto:hr@vikingtrading.net">hr@vikingtrading.net</a></p>
+                <p>上海市静安区 WeWork 越商大厦 12楼</p>
+            </div>
+            <div class="footer-copy">© 2025 VikingTrading. Defining the Future of Liquidity.</div>
+        </footer>
+    </main>
+
+    <script>
+        // --- Job Accordion Logic ---
+        function toggleJob(card) {
+            const content = card.querySelector('.job-content');
+            const isActive = card.classList.contains('active');
+            document.querySelectorAll('.job-card.active').forEach(c => {
+                if (c !== card) {
+                    c.classList.remove('active');
+                    c.querySelector('.job-content').style.height = '0';
+                }
+            });
+            if (isActive) {
+                card.classList.remove('active');
+                content.style.height = '0';
+            } else {
+                card.classList.add('active');
+                content.style.height = content.scrollHeight + 'px';
+            }
+        }
+
+        // --- Three.js Setup ---
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x050507, 0.001);
+
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
+        camera.position.set(0, 0, 30);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        container.appendChild(renderer.domElement);
+
+        // --- Objects Groups ---
+        const groupManifold = new THREE.Group(); 
+        const groupStructure = new THREE.Group(); 
+        const groupResearch = new THREE.Group(); 
+        
+        scene.add(groupManifold);
+        scene.add(groupStructure);
+        scene.add(groupResearch);
+
+        // --- 1. The Manifold ---
+        const manifoldGeometry = new THREE.PlaneGeometry(60, 40, 128, 128);
+        const canvas = document.createElement('canvas'); canvas.width = 32; canvas.height = 32;
+        const ctx = canvas.getContext('2d');
+        const gradient = ctx.createRadialGradient(16, 16, 0, 16, 16, 16);
+        gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
+        gradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.5)');
+        gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+        ctx.fillStyle = gradient; ctx.fillRect(0, 0, 32, 32);
+        const particleTexture = new THREE.CanvasTexture(canvas);
+        
+        const manifoldMaterial = new THREE.PointsMaterial({
+            color: 0x2997ff, size: 0.15, transparent: true, opacity: 0.60,
+            blending: THREE.AdditiveBlending, map: particleTexture, depthWrite: false
+        });
+        const manifoldMesh = new THREE.Points(manifoldGeometry, manifoldMaterial);
+        manifoldMesh.rotation.x = -Math.PI / 2.5; 
+        groupManifold.add(manifoldMesh);
+
+        const simplex = new SimplexNoise();
+
+        // --- 2. The Structure ---
+        const curveCount = 300;
+        let curveWidth = 0;
+        const curve1Geometry = new THREE.BufferGeometry();
+        const curve2Geometry = new THREE.BufferGeometry();
+        const curve1Positions = new Float32Array(curveCount * 3);
+        const curve2Positions = new Float32Array(curveCount * 3);
+        
+        for(let i=0; i<curveCount; i++) {
+            curve1Positions[i*3+1] = 0; curve1Positions[i*3+2] = 0;
+            curve2Positions[i*3+1] = 0; curve2Positions[i*3+2] = 0;
+        }
+        curve1Geometry.setAttribute('position', new THREE.BufferAttribute(curve1Positions, 3));
+        curve2Geometry.setAttribute('position', new THREE.BufferAttribute(curve2Positions, 3));
+        const curveMaterial1 = new THREE.LineBasicMaterial({ color: 0x00ffaa, transparent: true, opacity: 0.8 });
+        const curveMaterial2 = new THREE.LineBasicMaterial({ color: 0xff00aa, transparent: true, opacity: 0.8 });
+        const curve1 = new THREE.Line(curve1Geometry, curveMaterial1);
+        const curve2 = new THREE.Line(curve2Geometry, curveMaterial2);
+        groupStructure.add(curve1); groupStructure.add(curve2);
+        
+        let price1 = 0, price2 = 0;
+        const beta1 = 0.20; const beta2 = 0.20; 
+        const sigma1 = 0.10; const sigma2 = 0.25; 
+        const alpha1 = 0.0005; const alpha2 = 0.015;  
+        
+        function randomStable(alpha) {
+            const u = (Math.random() - 0.5) * Math.PI; 
+            const w = -Math.log(Math.random()); 
+            if (alpha === 1) return Math.tan(u);
+            const t1 = Math.sin(alpha * u);
+            const t2 = Math.pow(Math.cos(u), 1/alpha);
+            const t3 = Math.pow(Math.cos((1 - alpha) * u) / w, (1 - alpha) / alpha);
+            return (t1 / t2) * t3;
+        }
+
+        let targetGroupY = 0;
+        function updateCurveSize() {
+            const vFOV = camera.fov * Math.PI / 180;
+            const visibleHeight = 2 * Math.tan(vFOV / 2) * camera.position.z;
+            const visibleWidth = visibleHeight * camera.aspect;
+            curveWidth = visibleWidth * 1.2; 
+            const pos1 = curve1.geometry.attributes.position.array;
+            const pos2 = curve2.geometry.attributes.position.array;
+            for(let i=0; i<curveCount; i++) {
+                const x = (i / (curveCount - 1)) * curveWidth - (curveWidth / 2);
+                pos1[i*3] = x; pos2[i*3] = x;
+            }
+            curve1.geometry.attributes.position.needsUpdate = true;
+            curve2.geometry.attributes.position.needsUpdate = true;
+        }
+        updateCurveSize();
+        
+        // --- 3. Research (Neuron Network) ---
+        const neuronCount = 200;
+        const neuronConnectionDistance = 12;
+        const neuronNodes = [];
+        const neuronPosArray = new Float32Array(neuronCount * 3);
+
+        for(let i=0; i<neuronCount; i++) {
+            const r = 40 * Math.cbrt(Math.random()); 
+            const theta = Math.random() * Math.PI * 2;
+            const phi = Math.acos(2 * Math.random() - 1);
+            const x = r * Math.sin(phi) * Math.cos(theta);
+            const y = r * Math.sin(phi) * Math.sin(theta);
+            const z = r * Math.cos(phi);
+            neuronNodes.push(new THREE.Vector3(x, y, z));
+            neuronPosArray[i*3] = x; neuronPosArray[i*3+1] = y; neuronPosArray[i*3+2] = z;
+        }
+
+        const neuronLinePositions = [];
+        for(let i=0; i<neuronCount; i++) {
+            for(let j=i+1; j<neuronCount; j++) {
+                const dist = neuronNodes[i].distanceTo(neuronNodes[j]);
+                if(dist < neuronConnectionDistance) {
+                    neuronLinePositions.push(
+                        neuronNodes[i].x, neuronNodes[i].y, neuronNodes[i].z,
+                        neuronNodes[j].x, neuronNodes[j].y, neuronNodes[j].z
+                    );
+                }
+            }
+        }
+
+        const neuronGeo = new THREE.BufferGeometry();
+        neuronGeo.setAttribute('position', new THREE.BufferAttribute(neuronPosArray, 3));
+        const connectionGeo = new THREE.BufferGeometry();
+        connectionGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(neuronLinePositions), 3));
+
+        const neuronVertexShader = `
+            uniform float uTime; varying vec3 vPos;
+            void main() {
+                vec3 pos = position + vec3(sin(uTime * 0.5 + position.y * 0.1) * 0.5, cos(uTime * 0.5 + position.x * 0.1) * 0.5, 0.0);
+                vPos = pos;
+                vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
+                gl_PointSize = 4.0 * (30.0 / -mvPosition.z);
+                gl_Position = projectionMatrix * mvPosition;
+            }
+        `;
+        const neuronFragmentShader = `
+            uniform float uTime; uniform vec3 uPulseOrigins[5]; uniform float uPulseStarts[5]; uniform vec3 uColor; uniform float uOpacity;
+            varying vec3 vPos;
+            void main() {
+                float brightness = 0.15; 
+                for(int i=0; i<5; i++) {
+                    float age = uTime - uPulseStarts[i];
+                    if(age > 0.0 && age < 6.0) {
+                        float dist = distance(vPos, uPulseOrigins[i]);
+                        float waveRadius = age * 12.0; float waveWidth = 6.0;
+                        float diff = dist - waveRadius;
+                        float pulse = exp(-pow(diff, 2.0) / (waveWidth * waveWidth));
+                        brightness += pulse * 1.5 * (1.0 - age/6.0); 
+                    }
+                }
+                vec2 coord = gl_PointCoord - vec2(0.5);
+                if(length(coord) > 0.5) discard;
+                gl_FragColor = vec4(uColor, brightness * uOpacity);
+            }
+        `;
+        const connectionVertexShader = `
+            uniform float uTime; varying vec3 vPos;
+            void main() {
+                vec3 pos = position + vec3(sin(uTime * 0.5 + position.y * 0.1) * 0.5, cos(uTime * 0.5 + position.x * 0.1) * 0.5, 0.0);
+                vPos = pos;
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+            }
+        `;
+        const connectionFragmentShader = `
+            uniform float uTime; uniform vec3 uPulseOrigins[5]; uniform float uPulseStarts[5]; uniform vec3 uColor; uniform float uOpacity;
+            varying vec3 vPos;
+            void main() {
+                float brightness = 0.03; 
+                for(int i=0; i<5; i++) {
+                    float age = uTime - uPulseStarts[i];
+                    if(age > 0.0 && age < 6.0) {
+                        float dist = distance(vPos, uPulseOrigins[i]);
+                        float waveRadius = age * 12.0; float waveWidth = 5.0;
+                        float diff = dist - waveRadius;
+                        float pulse = exp(-pow(diff, 2.0) / (waveWidth * waveWidth));
+                        brightness += pulse * 0.8 * (1.0 - age/6.0);
+                    }
+                }
+                gl_FragColor = vec4(uColor, brightness * uOpacity);
+            }
+        `;
+
+        const neuronUniforms = {
+            uTime: { value: 0 },
+            uPulseOrigins: { value: [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()] },
+            uPulseStarts: { value: [-10, -10, -10, -10, -10] },
+            uColor: { value: new THREE.Color(0x2997ff) },
+            uOpacity: { value: 1.0 }
+        };
+
+        const neuronMaterial = new THREE.ShaderMaterial({
+            uniforms: neuronUniforms, vertexShader: neuronVertexShader, fragmentShader: neuronFragmentShader,
+            transparent: true, depthWrite: false, blending: THREE.AdditiveBlending
+        });
+        const connectionMaterial = new THREE.ShaderMaterial({
+            uniforms: neuronUniforms, vertexShader: connectionVertexShader, fragmentShader: connectionFragmentShader,
+            transparent: true, depthWrite: false, blending: THREE.AdditiveBlending
+        });
+
+        const neuronPoints = new THREE.Points(neuronGeo, neuronMaterial);
+        const neuronConnections = new THREE.LineSegments(connectionGeo, connectionMaterial);
+        groupResearch.add(neuronPoints); groupResearch.add(neuronConnections);
+
+        groupManifold.visible = true; groupStructure.visible = false; groupResearch.visible = false;
+
+        // --- Animation Loop ---
+        let time = 0; let mouseX = 0; let mouseY = 0; let pulseIndex = 0;
+
+        function triggerPulse(origin) {
+            const startPos = origin || neuronNodes[Math.floor(Math.random() * neuronCount)];
+            neuronUniforms.uPulseOrigins.value[pulseIndex].copy(startPos);
+            neuronUniforms.uPulseStarts.value[pulseIndex] = time;
+            pulseIndex = (pulseIndex + 1) % 5;
+        }
+
+        document.addEventListener('mousemove', (e) => {
+            mouseX = (e.clientX / window.innerWidth) * 2 - 1;
+            mouseY = -(e.clientY / window.innerHeight) * 2 + 1;
+        });
+
+        function animate() {
+            requestAnimationFrame(animate); time += 0.005;
+
+            if (groupManifold.visible) {
+                const positions = manifoldGeometry.attributes.position.array;
+                for (let i = 0; i < positions.length; i += 3) {
+                    const x = positions[i]; const y = positions[i+1];
+                    const z = simplex.noise3D(x * 0.05, y * 0.05, time * 0.3) * 5 + simplex.noise3D(x * 0.1, y * 0.1, time * 0.5) * 2;
+                    positions[i+2] = z;
+                }
+                manifoldGeometry.attributes.position.needsUpdate = true;
+                manifoldMesh.rotation.z = time * 0.05;
+            }
+
+            if (groupStructure.visible) {
+                const vFOV = camera.fov * Math.PI / 180;
+                const visibleHeight = 2 * Math.tan(vFOV / 2) * camera.position.z;
+                const limit = visibleHeight / 2 * 0.9; 
+                const currentY = groupStructure.position.y;
+                const topY = Math.max(price1, price2) + currentY;
+                const bottomY = Math.min(price1, price2) + currentY;
+                
+                if (topY > limit) targetGroupY -= (topY - limit);
+                else if (bottomY < -limit) targetGroupY += (-limit - bottomY);
+                groupStructure.position.y += (targetGroupY - groupStructure.position.y) * 0.05;
+
+                const marketShock = randomStable(1.7);
+                const u1 = Math.random(); const u2 = Math.random();
+                const z1 = Math.sqrt(-2.0 * Math.log(u1)) * Math.cos(2.0 * Math.PI * u2);
+                const u3 = Math.random(); const u4 = Math.random();
+                const z2 = Math.sqrt(-2.0 * Math.log(u3)) * Math.cos(2.0 * Math.PI * u4);
+                
+                const delta1 = (beta1 * marketShock) + (sigma1 * z1) + alpha1 * (price2 - price1);
+                const delta2 = (beta2 * marketShock) + (sigma2 * z2) + alpha2 * (price1 - price2);
+                price1 += delta1; price2 += delta2;
+                
+                const positions1 = curve1.geometry.attributes.position.array;
+                const positions2 = curve2.geometry.attributes.position.array;
+                for(let i=0; i < curveCount - 1; i++) {
+                    positions1[i*3+1] = positions1[(i+1)*3+1]; positions2[i*3+1] = positions2[(i+1)*3+1];
+                }
+                positions1[(curveCount-1)*3+1] = price1; positions2[(curveCount-1)*3+1] = price2;
+                curve1.geometry.attributes.position.needsUpdate = true; curve2.geometry.attributes.position.needsUpdate = true;
+                groupStructure.rotation.y = Math.sin(time * 0.2) * 0.1;
+            }
+
+            if (groupResearch.visible) {
+                neuronUniforms.uTime.value = time;
+                groupResearch.rotation.y = time * 0.05;
+                if (Math.random() < 0.005) triggerPulse();
+            }
+
+            camera.position.x += (mouseX * 1 - camera.position.x) * 0.05;
+            camera.position.y += (mouseY * 1 - camera.position.y) * 0.05;
+            camera.lookAt(0, 0, 0);
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        // --- GSAP Animations & Nav Interaction ---
+        gsap.registerPlugin(ScrollTrigger);
+
+        const tlIntro = gsap.timeline();
+        tlIntro.to(".intro-logo", { opacity: 1, duration: 1.5, ease: "power2.inOut" })
+               .to(".intro-logo", { scale: 1.1, duration: 2, ease: "none" }, "<")
+               .to("#intro-overlay", { opacity: 0, duration: 1, ease: "power2.inOut", delay: 0.5, onComplete: () => { document.getElementById('intro-overlay').style.display = 'none'; }})
+               .to("#canvas-container", { opacity: 1, duration: 1 }, "-=0.5")
+               .to("nav", { opacity: 1, duration: 1 }, "-=0.5")
+               .to(".scroll-indicator", { opacity: 0.6, duration: 1, repeat: -1, yoyo: true }, "-=0.5");
+
+        // Nav Link Highlight Logic
+        const navLinks = document.querySelectorAll('.nav-link');
+        function updateNav(id) {
+            navLinks.forEach(link => {
+                if(link.getAttribute('href') === '#' + id) {
+                    link.classList.add('active');
+                } else {
+                    link.classList.remove('active');
+                }
+            });
+        }
+
+        document.querySelectorAll('section').forEach((section, index) => {
+            const h1 = section.querySelector('h1');
+            const p = section.querySelector('p');
+            const codes = section.querySelectorAll('.code-decoration');
+            const jobs = section.querySelectorAll('.jobs-container');
+
+            // Content Fade In
+            const tl = gsap.timeline({
+                scrollTrigger: {
+                    trigger: section,
+                    start: "top 60%", end: "bottom 40%",
+                    toggleActions: "play reverse play reverse"
+                }
+            });
+
+            tl.to(section, { opacity: 1, duration: 0.5 })
+              .to(h1, { y: 0, duration: 0.8, ease: "power3.out" }, "-=0.3")
+              .to(p, { y: 0, duration: 0.8, ease: "power3.out" }, "-=0.6");
+            
+            if (codes.length > 0) tl.to(codes, { opacity: 1, y: 0, scale: 1, duration: 0.8, ease: "back.out(1.7)", stagger: 0.2 }, "-=0.6");
+            if (jobs.length > 0) tl.to(jobs, { opacity: 1, y: 0, duration: 0.8, ease: "power2.out" }, "-=0.4");
+
+            // Background Switching & Nav Update
+            ScrollTrigger.create({
+                trigger: section,
+                start: "top 60%", end: "bottom 60%",
+                onEnter: () => {
+                    switchScene(index);
+                    updateNav(section.id);
+                },
+                onEnterBack: () => {
+                    switchScene(index);
+                    updateNav(section.id);
+                }
+            });
+        });
+
+        function fadeGroup(group, targetOpacity, duration) {
+            group.traverse((child) => {
+                if (child.isMesh || child.isPoints || child.isLine || child.isLineSegments) {
+                    const mat = child.material;
+                    if (mat.uniforms && mat.uniforms.uOpacity) {
+                        gsap.to(mat.uniforms.uOpacity, { value: targetOpacity, duration: duration, ease: "power2.inOut" });
+                    } else {
+                        child.material.transparent = true;
+                        gsap.killTweensOf(child.material);
+                        if (!child.userData.originalOpacity) child.userData.originalOpacity = child.material.opacity;
+                        const finalOpacity = targetOpacity * child.userData.originalOpacity;
+                        gsap.to(child.material, { opacity: finalOpacity, duration: duration, ease: "power2.inOut" });
+                    }
+                }
+            });
+        }
+
+        let currentSceneIndex = 0;
+        function switchScene(index) {
+            // Section 3 (Technology) and Section 4 (Join Us) share the Research/Neuron background
+            // We map index 3 (Join Us) to scene group 2 (Research) as well.
+            let targetGroupIndex = index;
+            if (index === 3) targetGroupIndex = 2; 
+
+            if (targetGroupIndex === currentSceneIndex && index !== 3) return; // Avoid re-trigger if same, unless entering section 4 explicitly
+
+            const prevGroupIndex = currentSceneIndex;
+            currentSceneIndex = targetGroupIndex;
+
+            const groups = [groupManifold, groupStructure, groupResearch];
+            const leavingGroup = groups[prevGroupIndex];
+            const enteringGroup = groups[targetGroupIndex];
+
+            // If we are just moving between Section 3 and 4, we don't need a full transition, 
+            // maybe just a pulse to show activity
+            if (prevGroupIndex === 2 && targetGroupIndex === 2) {
+                triggerPulse(new THREE.Vector3(0,0,0));
+                return;
+            }
+
+            if (leavingGroup) {
+                fadeGroup(leavingGroup, 0, 1.0);
+                if (prevGroupIndex === 0) { 
+                    gsap.to(leavingGroup.scale, { x: 0.1, y: 0.1, z: 0.1, duration: 1.5, ease: "power3.in" });
+                    gsap.to(leavingGroup.rotation, { z: "+=2", duration: 1.5, ease: "power3.in" });
+                } else if (prevGroupIndex === 1) {
+                    gsap.to(leavingGroup.scale, { y: 0.01, duration: 1.0, ease: "power2.in" });
+                } else if (prevGroupIndex === 2) {
+                    gsap.to(leavingGroup.scale, { x: 0.01, y: 0.01, z: 0.01, duration: 1.0, ease: "back.in(1.7)" });
+                }
+                gsap.delayedCall(1.5, () => {
+                    if(currentSceneIndex !== prevGroupIndex) {
+                        leavingGroup.visible = false;
+                        leavingGroup.scale.set(1,1,1); leavingGroup.rotation.set(0,0,0); leavingGroup.position.set(0,0,0);
+                    }
+                });
+            }
+
+            if (enteringGroup) {
+                enteringGroup.visible = true;
+                fadeGroup(enteringGroup, 0, 0);
+                fadeGroup(enteringGroup, 1, 1.5);
+                if (targetGroupIndex === 0) {
+                    enteringGroup.scale.set(0.5, 0.5, 0.5);
+                    gsap.to(enteringGroup.scale, { x: 1, y: 1, z: 1, duration: 1.5, ease: "elastic.out(1, 0.5)" });
+                } else if (targetGroupIndex === 1) {
+                    enteringGroup.scale.set(1, 0.01, 1);
+                    targetGroupY = -(price1 + price2) / 2; enteringGroup.position.y = targetGroupY;
+                    gsap.to(enteringGroup.scale, { y: 1, duration: 1.5, ease: "elastic.out(1, 0.5)" });
+                } else if (targetGroupIndex === 2) {
+                    enteringGroup.scale.set(0.1, 0.1, 0.1);
+                    gsap.to(enteringGroup.scale, { x: 1, y: 1, z: 1, duration: 2.0, ease: "expo.out" });
+                    triggerPulse(new THREE.Vector3(0,0,0));
+                    setTimeout(() => triggerPulse(new THREE.Vector3(0,0,0)), 500);
+                }
+            }
+            gsap.to(scene.fog, { density: 0.008, duration: 0.5, yoyo: true, repeat: 1 });
+        }
+    </script>
+</body>
+</html>

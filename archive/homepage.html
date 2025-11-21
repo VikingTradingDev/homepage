@@ -1,0 +1,968 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VikingTrading</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+    <!-- Simplex Noise for organic movement -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/simplex-noise/2.4.0/simplex-noise.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #050507;
+            --text-primary: #f5f5f7;
+            --text-secondary: #aaaaaf;
+            --accent: #2997ff;
+            --code-bg: rgba(20, 20, 23, 0.6);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            overflow-x: hidden;
+            overscroll-behavior: none;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        /* --- Intro Overlay --- */
+        #intro-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100vh;
+            background-color: #000;
+            z-index: 9999;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .intro-logo {
+            font-size: clamp(40px, 5vw, 80px);
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            background: linear-gradient(90deg, #333 0%, #fff 50%, #333 100%);
+            background-size: 200% auto;
+            background-clip: text;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: shine 3s linear infinite;
+            opacity: 0; /* Controlled by GSAP */
+        }
+
+        @keyframes shine {
+            to {
+                background-position: 200% center;
+            }
+        }
+
+        /* --- Canvas --- */
+        #canvas-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100vh;
+            z-index: 1;
+            opacity: 0;
+            transition: opacity 2s ease;
+            pointer-events: none;
+        }
+
+        /* --- Nav --- */
+        nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            padding: 24px 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 100;
+            mix-blend-mode: difference;
+            opacity: 0; /* Fade in after intro */
+        }
+
+        .logo {
+            font-size: 22px;
+            font-weight: 600;
+            letter-spacing: -0.01em;
+            color: #fff;
+        }
+
+        /* --- Main Content --- */
+        main {
+            position: relative;
+            z-index: 10;
+        }
+
+        section {
+            min-height: 100vh;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 100px 20px;
+            opacity: 0;
+            will-change: opacity, transform;
+            position: relative;
+        }
+
+        .hero-text {
+            max-width: 1000px;
+            margin: 0 auto;
+            position: relative;
+            z-index: 2;
+            padding: 60px;
+            border-radius: 24px;
+            transition: background 0.3s ease;
+        }
+
+        /* Glassmorphism for Section 1 - Ultra Minimal */
+        .glass-text {
+            /* 更大范围的径向渐变，中心更透明 */
+            background: radial-gradient(ellipse 120% 100% at center, rgba(10, 10, 15, 0.25) 0%, rgba(10, 10, 15, 0.05) 50%, transparent 100%);
+            /* 无边框和阴影 */
+            border: none;
+            box-shadow: none;
+        }
+        
+        /* Move Section 1 text up */
+        #section1 .hero-text {
+            transform: translateY(-15vh);
+        }
+
+        h1 {
+            font-size: clamp(48px, 8vw, 96px);
+            font-weight: 700;
+            line-height: 1.05;
+            letter-spacing: -0.02em;
+            margin-bottom: 32px;
+            background: linear-gradient(180deg, #ffffff 0%, #b0b0b0 100%);
+            background-clip: text;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            transform: translateY(40px);
+        }
+
+        p {
+            font-size: clamp(22px, 3vw, 32px);
+            line-height: 1.4;
+            font-weight: 400;
+            color: var(--text-secondary);
+            max-width: 800px;
+            margin: 0 auto;
+            transform: translateY(40px);
+        }
+
+        .highlight {
+            color: var(--text-primary);
+            font-weight: 500;
+            text-shadow: 0 0 20px rgba(255,255,255,0.3);
+        }
+
+        /* --- Code Snippet Decoration --- */
+        .code-decoration {
+            position: absolute;
+            background: var(--code-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 24px;
+            text-align: left;
+            font-family: "SF Mono", "Menlo", "Monaco", "Courier New", monospace;
+            font-size: 12px;
+            line-height: 1.5;
+            color: #d4d4d4;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+            opacity: 0;
+            width: auto;
+            max-width: 400px;
+            z-index: 1;
+        }
+
+        .code-decoration::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #2997ff, transparent);
+            opacity: 0.5;
+        }
+
+        .code-tl {
+            left: 8%;
+            top: 16%;
+            transform: translateY(40px) rotate(-4deg) scale(0.85);
+        }
+
+        .code-tr {
+            right: 8%;
+            top: 19%;
+            transform: translateY(40px) rotate(3deg) scale(0.85);
+        }
+
+        .code-bl {
+            left: 10%;
+            bottom: 14%;
+            transform: translateY(40px) rotate(2deg) scale(0.85);
+        }
+
+        .code-br {
+            right: 10%;
+            bottom: 12%;
+            transform: translateY(40px) rotate(-5deg) scale(0.85);
+        }
+
+        .code-line {
+            display: block;
+        }
+        .c-keyword { color: #c586c0; }
+        .c-func { color: #dcdcaa; }
+        .c-str { color: #ce9178; }
+        .c-param { color: #9cdcfe; }
+        .c-const { color: #4fc1ff; }
+        .c-bool { color: #569cd6; }
+
+        /* --- Scroll Indicator --- */
+        .scroll-indicator {
+            position: absolute;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 1px;
+            height: 80px;
+            background: linear-gradient(to bottom, rgba(255,255,255,0.5), transparent);
+            opacity: 0;
+        }
+
+        footer {
+            height: 50vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            align-items: center;
+            padding-bottom: 60px;
+            background: linear-gradient(to top, #000, transparent);
+        }
+
+        .footer-logo {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 16px;
+            color: #fff;
+        }
+
+        .footer-copy {
+            font-size: 14px;
+            color: #555;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 0px;
+            background: transparent;
+        }
+    </style>
+</head>
+<body>
+    <!-- Intro Overlay -->
+    <div id="intro-overlay">
+        <div class="intro-logo">VikingTrading</div>
+    </div>
+
+    <div id="canvas-container"></div>
+
+    <nav>
+        <div class="logo">VikingTrading</div>
+    </nav>
+
+    <main>
+        <section id="section1">
+            <div class="hero-text glass-text">
+                <h1>流动性提供商</h1>
+                <p>我们在<span class="highlight">时间与空间</span>中搬运流动性，<br>监测不同场所的流动性洼地，<br>平抑市场中突如其来的需求。</p>
+            </div>
+            <div class="scroll-indicator"></div>
+        </section>
+
+        <section id="section2">
+            <div class="hero-text">
+                <h1>纯粹的交易艺术</h1>
+                <p>用技术和策略在市场上交易。<br>我们的生意完全依靠<span class="highlight">交易盈利</span>，<br>无甲方、无乙方。</p>
+            </div>
+        </section>
+
+        <section id="section3">
+            <div class="hero-text">
+                <h1>认知的边界</h1>
+                <p>我们珍视市场直觉和对 <span class="highlight">Market Microstructure</span> 的准确理解。<br>用数据、直觉和纸笔，<br>拓展我们认知和策略的边界。</p>
+            </div>
+
+            <!-- 1. Data Fetching (Top Left) -->
+            <div class="code-decoration code-tl">
+                <span class="code-line"><span class="c-param">trades_df</span> = <span class="c-param">vk</span>.<span class="c-func">get_data</span>(</span>
+                <span class="code-line">&nbsp;&nbsp;&nbsp;&nbsp;<span class="c-param">exchange</span>=<span class="c-str">"kraken"</span>,</span>
+                <span class="code-line">&nbsp;&nbsp;&nbsp;&nbsp;<span class="c-param">currency_pair</span>=<span class="c-str">"btcusd"</span>,</span>
+                <span class="code-line">&nbsp;&nbsp;&nbsp;&nbsp;<span class="c-param">data_type</span>=<span class="c-str">"trades"</span>,</span>
+                <span class="code-line">&nbsp;&nbsp;&nbsp;&nbsp;<span class="c-param">start_date</span>=<span class="c-str">"2024-08-22"</span>,</span>
+                <span class="code-line">&nbsp;&nbsp;&nbsp;&nbsp;<span class="c-param">end_date</span>=<span class="c-str">"2025-03-17"</span></span>
+                <span class="code-line">)</span>
+            </div>
+
+            <!-- 2. Market Impact (Top Right) -->
+            <div class="code-decoration code-tr">
+                <span class="code-line"><span class="c-param">mif</span> = <span class="c-param">vk</span>.<span class="c-func">MIFTradesDataImporter</span>(</span>
+                <span class="code-line">&nbsp;&nbsp;&nbsp;&nbsp;<span class="c-param">exchange</span>=<span class="c-str">"binance_future"</span>,</span>
+                <span class="code-line">&nbsp;&nbsp;&nbsp;&nbsp;<span class="c-param">currency_pair</span>=<span class="c-str">"btc-usdt"</span></span>
+                <span class="code-line">)</span>
+                <br>
+                <span class="code-line"><span class="c-param">impact_df</span> = <span class="c-param">mif</span>.<span class="c-func">get_data</span>(</span>
+                <span class="code-line">&nbsp;&nbsp;&nbsp;&nbsp;<span class="c-param">date</span>=<span class="c-str">"2024-01-15"</span>,</span>
+                <span class="code-line">&nbsp;&nbsp;&nbsp;&nbsp;<span class="c-param">use_fp</span>=<span class="c-bool">True</span></span>
+                <span class="code-line">)</span>
+            </div>
+
+            <!-- 3. Event Study (Bottom Left) -->
+            <div class="code-decoration code-bl">
+                <span class="code-line"><span class="c-param">vk</span>.<span class="c-func">plot_event_study</span>(</span>
+                <span class="code-line">&nbsp;&nbsp;&nbsp;&nbsp;<span class="c-param">trades_df</span>=<span class="c-param">trades_df</span>,</span>
+                <span class="code-line">&nbsp;&nbsp;&nbsp;&nbsp;<span class="c-param">return_cols</span>=<span class="c-param">return_cols</span>,</span>
+                <span class="code-line">&nbsp;&nbsp;&nbsp;&nbsp;<span class="c-param">flag_col</span>=<span class="c-str">'side'</span>,</span>
+                <span class="code-line">&nbsp;&nbsp;&nbsp;&nbsp;<span class="c-param">title</span>=<span class="c-str">"Large Trade Impact"</span></span>
+                <span class="code-line">)</span>
+            </div>
+
+            <!-- 4. Backtest (Bottom Right) -->
+            <div class="code-decoration code-br">
+                <span class="code-line"><span class="c-param">config</span> = <span class="c-func">prepare_config</span>(</span>
+                <span class="code-line">&nbsp;&nbsp;&nbsp;&nbsp;<span class="c-param">base_config</span>=<span class="c-str">'kk50_baseline'</span>,</span>
+                <span class="code-line">&nbsp;&nbsp;&nbsp;&nbsp;<span class="c-param">experiment_name</span>=<span class="c-str">'new_backtest'</span>,</span>
+                <span class="code-line">&nbsp;&nbsp;&nbsp;&nbsp;<span class="c-param">user_name</span>=<span class="c-str">'viking'</span>,</span>
+                <span class="code-line">&nbsp;&nbsp;&nbsp;&nbsp;<span class="c-param">start_date</span>=<span class="c-str">'2023-01-01'</span>,</span>
+                <span class="code-line">&nbsp;&nbsp;&nbsp;&nbsp;<span class="c-param">end_date</span>=<span class="c-str">'2024-12-31'</span></span>
+                <span class="code-line">)</span>
+                <br>
+                <span class="code-line"><span class="c-param">result</span> = <span class="c-func">run_backtest</span>(<span class="c-param">config</span>)</span>
+            </div>
+        </section>
+        
+        <footer>
+            <div class="footer-logo">VikingTrading</div>
+            <div class="footer-copy">© 2025 VikingTrading. Defining the Future of Liquidity.</div>
+        </footer>
+    </main>
+
+    <script>
+        // --- Three.js Setup ---
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x050507, 0.001);
+
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
+        camera.position.set(0, 0, 30);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        container.appendChild(renderer.domElement);
+
+        // --- Objects Groups ---
+        const groupManifold = new THREE.Group(); // Section 1: Chaos
+        const groupStructure = new THREE.Group(); // Section 2: Order/Code
+        const groupResearch = new THREE.Group(); // Section 3: Cognition (Neuron Network)
+        
+        scene.add(groupManifold);
+        scene.add(groupStructure);
+        scene.add(groupResearch);
+
+        // --- 1. The Manifold (Chaotic Market) ---
+        const manifoldGeometry = new THREE.PlaneGeometry(60, 40, 128, 128);
+        
+        // Create circular particle texture
+        const canvas = document.createElement('canvas');
+        canvas.width = 32;
+        canvas.height = 32;
+        const ctx = canvas.getContext('2d');
+        const gradient = ctx.createRadialGradient(16, 16, 0, 16, 16, 16);
+        gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
+        gradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.5)');
+        gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, 32, 32);
+        const particleTexture = new THREE.CanvasTexture(canvas);
+        
+        const manifoldMaterial = new THREE.PointsMaterial({
+            color: 0x2997ff,
+            size: 0.15,
+            transparent: true,
+            opacity: 0.60,
+            blending: THREE.AdditiveBlending,
+            map: particleTexture,
+            depthWrite: false
+        });
+        const manifoldMesh = new THREE.Points(manifoldGeometry, manifoldMaterial);
+        manifoldMesh.rotation.x = -Math.PI / 2.5; 
+        groupManifold.add(manifoldMesh);
+
+        const simplex = new SimplexNoise();
+
+        // --- 2. The Structure (Trading / K-Line Curves) ---
+        const curveCount = 300;
+        let curveWidth = 0; // Will be set by updateCurveSize
+        const curve1Geometry = new THREE.BufferGeometry();
+        const curve2Geometry = new THREE.BufferGeometry();
+        
+        const curve1Positions = new Float32Array(curveCount * 3);
+        const curve2Positions = new Float32Array(curveCount * 3);
+        
+        // Initialize with flat lines (X positions will be updated)
+        for(let i=0; i<curveCount; i++) {
+            curve1Positions[i*3+1] = 0;
+            curve1Positions[i*3+2] = 0;
+            curve2Positions[i*3+1] = 0;
+            curve2Positions[i*3+2] = 0;
+        }
+        
+        curve1Geometry.setAttribute('position', new THREE.BufferAttribute(curve1Positions, 3));
+        curve2Geometry.setAttribute('position', new THREE.BufferAttribute(curve2Positions, 3));
+        
+        const curveMaterial1 = new THREE.LineBasicMaterial({ color: 0x00ffaa, transparent: true, opacity: 0.8 });
+        const curveMaterial2 = new THREE.LineBasicMaterial({ color: 0xff00aa, transparent: true, opacity: 0.8 });
+        
+        const curve1 = new THREE.Line(curve1Geometry, curveMaterial1);
+        const curve2 = new THREE.Line(curve2Geometry, curveMaterial2);
+        
+        groupStructure.add(curve1);
+        groupStructure.add(curve2);
+        
+        // Simulation State
+        let price1 = 0;
+        let price2 = 0;
+        
+        // 1. Beta (Common Factor Sensitivity)
+        const beta1 = 0.20; // Green: Moderate market correlation
+        const beta2 = 0.20; // Red: High market correlation
+        
+        // 2. Independent Volatility (Normal Distribution)
+        const sigma1 = 0.10; // Green: Low idiosyncratic risk
+        const sigma2 = 0.25; // Red: High idiosyncratic risk
+        
+        // 3. Alpha (Mean Reversion)
+        const alpha1 = 0.0005; // Green: Core asset, barely moves for Red
+        const alpha2 = 0.015;  // Red: Speculative, reverts to Green  
+        
+        // Stable Distribution Generator (Chambers-Mallows-Stuck)
+        function randomStable(alpha) {
+            const u = (Math.random() - 0.5) * Math.PI; // Uniform (-pi/2, pi/2)
+            const w = -Math.log(Math.random()); // Exponential(1)
+            
+            if (alpha === 1) { // Cauchy
+                return Math.tan(u);
+            }
+            
+            const t1 = Math.sin(alpha * u);
+            const t2 = Math.pow(Math.cos(u), 1/alpha);
+            const t3 = Math.pow(Math.cos((1 - alpha) * u) / w, (1 - alpha) / alpha);
+            
+            return (t1 / t2) * t3;
+        }
+
+        // Viewport Management
+        let targetGroupY = 0;
+        
+        function updateCurveSize() {
+            // Calculate visible width at z=0
+            const vFOV = camera.fov * Math.PI / 180;
+            const visibleHeight = 2 * Math.tan(vFOV / 2) * camera.position.z;
+            const visibleWidth = visibleHeight * camera.aspect;
+            
+            curveWidth = visibleWidth * 1.2; // Slightly wider than screen
+            
+            const pos1 = curve1.geometry.attributes.position.array;
+            const pos2 = curve2.geometry.attributes.position.array;
+            
+            for(let i=0; i<curveCount; i++) {
+                const x = (i / (curveCount - 1)) * curveWidth - (curveWidth / 2);
+                pos1[i*3] = x;
+                pos2[i*3] = x;
+            }
+            curve1.geometry.attributes.position.needsUpdate = true;
+            curve2.geometry.attributes.position.needsUpdate = true;
+        }
+        
+        // Initial size update
+        updateCurveSize();
+        
+        // --- 3. Research (Cognition / Neuron Network) ---
+        // A network of neurons that light up with ripple effects
+        
+        const neuronCount = 200;
+        const neuronConnectionDistance = 12;
+        const neuronNodes = [];
+        const neuronPosArray = new Float32Array(neuronCount * 3);
+
+        // Generate Nodes in a sphere
+        for(let i=0; i<neuronCount; i++) {
+            const r = 40 * Math.cbrt(Math.random()); // Uniform sphere distribution
+            const theta = Math.random() * Math.PI * 2;
+            const phi = Math.acos(2 * Math.random() - 1);
+            
+            const x = r * Math.sin(phi) * Math.cos(theta);
+            const y = r * Math.sin(phi) * Math.sin(theta);
+            const z = r * Math.cos(phi);
+            
+            neuronNodes.push(new THREE.Vector3(x, y, z));
+            neuronPosArray[i*3] = x;
+            neuronPosArray[i*3+1] = y;
+            neuronPosArray[i*3+2] = z;
+        }
+
+        // Generate Connections
+        const neuronLinePositions = [];
+        for(let i=0; i<neuronCount; i++) {
+            for(let j=i+1; j<neuronCount; j++) {
+                const dist = neuronNodes[i].distanceTo(neuronNodes[j]);
+                if(dist < neuronConnectionDistance) {
+                    neuronLinePositions.push(
+                        neuronNodes[i].x, neuronNodes[i].y, neuronNodes[i].z,
+                        neuronNodes[j].x, neuronNodes[j].y, neuronNodes[j].z
+                    );
+                }
+            }
+        }
+
+        const neuronGeo = new THREE.BufferGeometry();
+        neuronGeo.setAttribute('position', new THREE.BufferAttribute(neuronPosArray, 3));
+
+        const connectionGeo = new THREE.BufferGeometry();
+        connectionGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(neuronLinePositions), 3));
+
+        // Shaders for Ripple Effect
+        const neuronVertexShader = `
+            uniform float uTime;
+            varying vec3 vPos;
+            void main() {
+                // Subtle breathing motion
+                vec3 pos = position + vec3(
+                    sin(uTime * 0.5 + position.y * 0.1) * 0.5,
+                    cos(uTime * 0.5 + position.x * 0.1) * 0.5,
+                    0.0
+                );
+                vPos = pos;
+                vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
+                gl_PointSize = 4.0 * (30.0 / -mvPosition.z);
+                gl_Position = projectionMatrix * mvPosition;
+            }
+        `;
+
+        const neuronFragmentShader = `
+            uniform float uTime;
+            uniform vec3 uPulseOrigins[5];
+            uniform float uPulseStarts[5];
+            uniform vec3 uColor;
+            uniform float uOpacity;
+            
+            varying vec3 vPos;
+            
+            void main() {
+                float brightness = 0.15; // Base glow
+                
+                for(int i=0; i<5; i++) {
+                    float age = uTime - uPulseStarts[i];
+                    if(age > 0.0 && age < 6.0) {
+                        float dist = distance(vPos, uPulseOrigins[i]);
+                        float waveRadius = age * 12.0; // Speed
+                        float waveWidth = 6.0;
+                        
+                        // Gaussian-like pulse
+                        float diff = dist - waveRadius;
+                        float pulse = exp(-pow(diff, 2.0) / (waveWidth * waveWidth));
+                        
+                        brightness += pulse * 1.5 * (1.0 - age/6.0); // Fade out over time
+                    }
+                }
+                
+                // Circular particle shape
+                vec2 coord = gl_PointCoord - vec2(0.5);
+                if(length(coord) > 0.5) discard;
+                
+                gl_FragColor = vec4(uColor, brightness * uOpacity);
+            }
+        `;
+
+        const connectionVertexShader = `
+            uniform float uTime;
+            varying vec3 vPos;
+            void main() {
+                // Match point motion
+                vec3 pos = position + vec3(
+                    sin(uTime * 0.5 + position.y * 0.1) * 0.5,
+                    cos(uTime * 0.5 + position.x * 0.1) * 0.5,
+                    0.0
+                );
+                vPos = pos;
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+            }
+        `;
+
+        const connectionFragmentShader = `
+            uniform float uTime;
+            uniform vec3 uPulseOrigins[5];
+            uniform float uPulseStarts[5];
+            uniform vec3 uColor;
+            uniform float uOpacity;
+            
+            varying vec3 vPos;
+            
+            void main() {
+                float brightness = 0.03; // Base faint line
+                
+                for(int i=0; i<5; i++) {
+                    float age = uTime - uPulseStarts[i];
+                    if(age > 0.0 && age < 6.0) {
+                        float dist = distance(vPos, uPulseOrigins[i]);
+                        float waveRadius = age * 12.0;
+                        float waveWidth = 5.0;
+                        
+                        float diff = dist - waveRadius;
+                        float pulse = exp(-pow(diff, 2.0) / (waveWidth * waveWidth));
+                        
+                        brightness += pulse * 0.8 * (1.0 - age/6.0);
+                    }
+                }
+                
+                gl_FragColor = vec4(uColor, brightness * uOpacity);
+            }
+        `;
+
+        const neuronUniforms = {
+            uTime: { value: 0 },
+            uPulseOrigins: { value: [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()] },
+            uPulseStarts: { value: [-10, -10, -10, -10, -10] },
+            uColor: { value: new THREE.Color(0x2997ff) },
+            uOpacity: { value: 1.0 }
+        };
+
+        const neuronMaterial = new THREE.ShaderMaterial({
+            uniforms: neuronUniforms,
+            vertexShader: neuronVertexShader,
+            fragmentShader: neuronFragmentShader,
+            transparent: true,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending
+        });
+
+        const connectionMaterial = new THREE.ShaderMaterial({
+            uniforms: neuronUniforms, // Share uniforms
+            vertexShader: connectionVertexShader,
+            fragmentShader: connectionFragmentShader,
+            transparent: true,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending
+        });
+
+        const neuronPoints = new THREE.Points(neuronGeo, neuronMaterial);
+        const neuronConnections = new THREE.LineSegments(connectionGeo, connectionMaterial);
+
+        groupResearch.add(neuronPoints);
+        groupResearch.add(neuronConnections);
+
+        // Initial Visibility
+        groupManifold.visible = true;
+        groupStructure.visible = false;
+        groupResearch.visible = false;
+
+        // --- Animation Loop ---
+        let time = 0;
+        let mouseX = 0;
+        let mouseY = 0;
+        let pulseIndex = 0;
+
+        function triggerPulse(origin) {
+            const startPos = origin || neuronNodes[Math.floor(Math.random() * neuronCount)];
+            neuronUniforms.uPulseOrigins.value[pulseIndex].copy(startPos);
+            neuronUniforms.uPulseStarts.value[pulseIndex] = time;
+            pulseIndex = (pulseIndex + 1) % 5;
+        }
+
+        document.addEventListener('mousemove', (e) => {
+            mouseX = (e.clientX / window.innerWidth) * 2 - 1;
+            mouseY = -(e.clientY / window.innerHeight) * 2 + 1;
+        });
+
+        function animate() {
+            requestAnimationFrame(animate);
+            time += 0.005;
+
+            // 1. Manifold
+            if (groupManifold.visible) {
+                const positions = manifoldGeometry.attributes.position.array;
+                for (let i = 0; i < positions.length; i += 3) {
+                    const x = positions[i];
+                    const y = positions[i+1];
+                    const z = simplex.noise3D(x * 0.05, y * 0.05, time * 0.3) * 5 
+                            + simplex.noise3D(x * 0.1, y * 0.1, time * 0.5) * 2;
+                    positions[i+2] = z;
+                }
+                manifoldGeometry.attributes.position.needsUpdate = true;
+                manifoldMesh.rotation.z = time * 0.05;
+            }
+
+            // 2. Structure
+            if (groupStructure.visible) {
+                // Conditional Auto-centering
+                const vFOV = camera.fov * Math.PI / 180;
+                const visibleHeight = 2 * Math.tan(vFOV / 2) * camera.position.z;
+                const limit = visibleHeight / 2 * 0.9; // 90% of screen half-height
+                
+                const currentY = groupStructure.position.y;
+                const topY = Math.max(price1, price2) + currentY;
+                const bottomY = Math.min(price1, price2) + currentY;
+                
+                if (topY > limit) {
+                    targetGroupY -= (topY - limit);
+                } else if (bottomY < -limit) {
+                    targetGroupY += (-limit - bottomY);
+                }
+                
+                // Smoothly move towards target
+                groupStructure.position.y += (targetGroupY - groupStructure.position.y) * 0.05;
+
+                // 1. Common Factor (Beta) - Stable Distribution (Medium Fat Tails)
+                const marketShock = randomStable(1.7);
+                
+                // 2. Independent Factors - Normal Distribution (Box-Muller)
+                const u1 = Math.random();
+                const u2 = Math.random();
+                const z1 = Math.sqrt(-2.0 * Math.log(u1)) * Math.cos(2.0 * Math.PI * u2);
+                
+                const u3 = Math.random();
+                const u4 = Math.random();
+                const z2 = Math.sqrt(-2.0 * Math.log(u3)) * Math.cos(2.0 * Math.PI * u4);
+                
+                // 3. Calculate Deltas
+                // Delta = Beta * Market + Sigma * Independent + Alpha * Reversion
+                const delta1 = (beta1 * marketShock) + (sigma1 * z1) + alpha1 * (price2 - price1);
+                const delta2 = (beta2 * marketShock) + (sigma2 * z2) + alpha2 * (price1 - price2);
+                
+                price1 += delta1;
+                price2 += delta2;
+                
+                // Shift arrays
+                const positions1 = curve1.geometry.attributes.position.array;
+                const positions2 = curve2.geometry.attributes.position.array;
+                
+                // Shift Y values to the left
+                for(let i=0; i < curveCount - 1; i++) {
+                    positions1[i*3+1] = positions1[(i+1)*3+1]; 
+                    positions2[i*3+1] = positions2[(i+1)*3+1];
+                }
+                
+                // Update newest point
+                positions1[(curveCount-1)*3+1] = price1;
+                positions2[(curveCount-1)*3+1] = price2;
+                
+                curve1.geometry.attributes.position.needsUpdate = true;
+                curve2.geometry.attributes.position.needsUpdate = true;
+                
+                // Slowly rotate the whole group for 3D feel
+                groupStructure.rotation.y = Math.sin(time * 0.2) * 0.1;
+            }
+
+            // 3. Research (Neuron)
+            if (groupResearch.visible) {
+                neuronUniforms.uTime.value = time;
+                groupResearch.rotation.y = time * 0.05;
+                
+                // Random pulses
+                if (Math.random() < 0.005) { 
+                    triggerPulse();
+                }
+            }
+
+            // Camera Parallax
+            camera.position.x += (mouseX * 1 - camera.position.x) * 0.05;
+            camera.position.y += (mouseY * 1 - camera.position.y) * 0.05;
+            camera.lookAt(0, 0, 0);
+
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            
+            // Update curve width on resize
+            updateCurveSize();
+        });
+
+        // --- GSAP Animations ---
+        gsap.registerPlugin(ScrollTrigger);
+
+        // Intro
+        const tlIntro = gsap.timeline();
+        tlIntro.to(".intro-logo", { opacity: 1, duration: 1.5, ease: "power2.inOut" })
+               .to(".intro-logo", { scale: 1.1, duration: 2, ease: "none" }, "<")
+               .to("#intro-overlay", { opacity: 0, duration: 1, ease: "power2.inOut", delay: 0.5, onComplete: () => {
+                   document.getElementById('intro-overlay').style.display = 'none';
+               }})
+               .to("#canvas-container", { opacity: 1, duration: 1 }, "-=0.5")
+               .to("nav", { opacity: 1, duration: 1 }, "-=0.5")
+               .to(".scroll-indicator", { opacity: 0.6, duration: 1, repeat: -1, yoyo: true }, "-=0.5");
+
+        // Content Animations
+        document.querySelectorAll('section').forEach((section, index) => {
+            const h1 = section.querySelector('h1');
+            const p = section.querySelector('p');
+            const codes = section.querySelectorAll('.code-decoration');
+
+            const tl = gsap.timeline({
+                scrollTrigger: {
+                    trigger: section,
+                    start: "top 60%",
+                    end: "bottom 40%",
+                    toggleActions: "play reverse play reverse"
+                }
+            });
+
+            tl.to(section, { opacity: 1, duration: 0.5 })
+              .to(h1, { y: 0, duration: 0.8, ease: "power3.out" }, "-=0.3")
+              .to(p, { y: 0, duration: 0.8, ease: "power3.out" }, "-=0.6");
+            
+            if (codes.length > 0) {
+                tl.to(codes, { opacity: 1, y: 0, scale: 1, duration: 0.8, ease: "back.out(1.7)", stagger: 0.2 }, "-=0.6");
+            }
+
+            // Background Scene Switching
+            ScrollTrigger.create({
+                trigger: section,
+                start: "top 85%", 
+                end: "bottom 85%",
+                onEnter: () => switchScene(index),
+                onEnterBack: () => switchScene(index)
+            });
+        });
+
+        // Helper to fade group opacity
+        function fadeGroup(group, targetOpacity, duration) {
+            group.traverse((child) => {
+                if (child.isMesh || child.isPoints || child.isLine || child.isLineSegments) {
+                    const mat = child.material;
+                    // Handle ShaderMaterial with uOpacity uniform
+                    if (mat.uniforms && mat.uniforms.uOpacity) {
+                        gsap.to(mat.uniforms.uOpacity, { value: targetOpacity, duration: duration, ease: "power2.inOut" });
+                    } 
+                    // Handle Standard Materials
+                    else {
+                    child.material.transparent = true;
+                    gsap.killTweensOf(child.material);
+                    if (!child.userData.originalOpacity) {
+                        child.userData.originalOpacity = child.material.opacity;
+                    }
+                    const finalOpacity = targetOpacity * child.userData.originalOpacity;
+                    gsap.to(child.material, { 
+                        opacity: finalOpacity, 
+                        duration: duration,
+                        ease: "power2.inOut"
+                    });
+                    }
+                }
+            });
+        }
+
+        let currentSceneIndex = 0;
+
+        function switchScene(index) {
+            if (index === currentSceneIndex) return;
+            
+            const prevIndex = currentSceneIndex;
+            currentSceneIndex = index;
+
+            const groups = [groupManifold, groupStructure, groupResearch];
+            const leavingGroup = groups[prevIndex];
+            const enteringGroup = groups[index];
+
+            // --- Special Transition Effects ---
+
+            // 1. Leaving Group Effect
+            if (leavingGroup) {
+                // Fade out
+                fadeGroup(leavingGroup, 0, 1.0);
+                
+                // Special Transform based on what it is
+                if (prevIndex === 0) { // Manifold leaving
+                    gsap.to(leavingGroup.scale, { x: 0.1, y: 0.1, z: 0.1, duration: 1.5, ease: "power3.in" });
+                    gsap.to(leavingGroup.rotation, { z: "+=2", duration: 1.5, ease: "power3.in" });
+                } else if (prevIndex === 1) { // Curves leaving
+                    gsap.to(leavingGroup.scale, { y: 0.01, duration: 1.0, ease: "power2.in" });
+                } else if (prevIndex === 2) { // Research leaving
+                    // Implode
+                    gsap.to(leavingGroup.scale, { x: 0.01, y: 0.01, z: 0.01, duration: 1.0, ease: "back.in(1.7)" });
+                }
+
+                // Hide after animation
+                gsap.delayedCall(1.5, () => {
+                    if(currentSceneIndex !== prevIndex) {
+                        leavingGroup.visible = false;
+                        leavingGroup.scale.set(1,1,1);
+                        leavingGroup.rotation.set(0,0,0);
+                        leavingGroup.position.set(0,0,0);
+                    }
+                });
+            }
+
+            // 2. Entering Group Effect
+            if (enteringGroup) {
+                enteringGroup.visible = true;
+                fadeGroup(enteringGroup, 0, 0); // Start invisible
+                fadeGroup(enteringGroup, 1, 1.5); // Slow fade in
+
+                if (index === 0) { // Manifold entering
+                    enteringGroup.scale.set(0.5, 0.5, 0.5);
+                    gsap.to(enteringGroup.scale, { x: 1, y: 1, z: 1, duration: 1.5, ease: "elastic.out(1, 0.5)" });
+                } else if (index === 1) { // Curves entering
+                    enteringGroup.scale.set(1, 0.01, 1); // Start flat
+                    // Center the group to current price level immediately
+                    targetGroupY = -(price1 + price2) / 2;
+                    enteringGroup.position.y = targetGroupY;
+                    
+                    gsap.to(enteringGroup.scale, { y: 1, duration: 1.5, ease: "elastic.out(1, 0.5)" });
+                } else if (index === 2) { // Research entering
+                    // Big Bang Expansion
+                    enteringGroup.scale.set(0.1, 0.1, 0.1);
+                    gsap.to(enteringGroup.scale, { x: 1, y: 1, z: 1, duration: 2.0, ease: "expo.out" });
+                    // Trigger a massive pulse from center
+                    triggerPulse(new THREE.Vector3(0,0,0));
+                    // Trigger another one slightly later
+                    setTimeout(() => triggerPulse(new THREE.Vector3(0,0,0)), 500);
+                }
+            }
+
+            // 3. Fog Transition
+            gsap.to(scene.fog, { density: 0.008, duration: 0.5, yoyo: true, repeat: 1 });
+        }
+
+    </script>
+</body>
+</html>

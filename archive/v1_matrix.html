@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VikingTrading | Algorithmic Supremacy</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@100;400;700&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+    <!-- GSAP -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+
+    <style>
+        /* --- Core UI & Scrollbar --- */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #050505; }
+        ::-webkit-scrollbar-thumb { background: #00ff41; border-radius: 3px; }
+
+        body {
+            margin: 0;
+            overflow-x: hidden;
+            background-color: #000;
+            color: #e0e0e0;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        #canvas-container {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        /* --- Typography & Effects --- */
+        .font-cyber { font-family: 'Orbitron', sans-serif; }
+        .text-neon { color: #00ff41; text-shadow: 0 0 10px rgba(0, 255, 65, 0.5); }
+        .text-cyan { color: #00f3ff; text-shadow: 0 0 10px rgba(0, 243, 255, 0.5); }
+        
+        .glass-panel {
+            background: rgba(5, 10, 5, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(0, 255, 65, 0.15);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+        }
+        .glass-panel:hover {
+            border-color: rgba(0, 255, 65, 0.5);
+            box-shadow: 0 0 20px rgba(0, 255, 65, 0.2);
+        }
+
+        /* Code Block Style */
+        .code-block {
+            background: #0a0a0a;
+            border-left: 3px solid #00ff41;
+            font-size: 0.85rem;
+            line-height: 1.6;
+        }
+
+        /* Glitch Animation */
+        .glitch { position: relative; }
+        .glitch::before, .glitch::after {
+            content: attr(data-text);
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0.8;
+        }
+        .glitch::before {
+            color: #0ff; z-index: -1; animation: glitch-effect 3s infinite;
+        }
+        .glitch::after {
+            color: #f0f; z-index: -2; animation: glitch-effect 2s infinite reverse;
+        }
+        @keyframes glitch-effect {
+            0% { transform: translate(0); }
+            20% { transform: translate(-2px, 2px); }
+            40% { transform: translate(-2px, -2px); }
+            60% { transform: translate(2px, 2px); }
+            80% { transform: translate(2px, -2px); }
+            100% { transform: translate(0); }
+        }
+
+        /* Section Spacing */
+        section {
+            min-height: 100vh;
+            position: relative;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            padding: 2rem;
+        }
+
+        /* Loading Overlay */
+        #loader {
+            position: fixed; inset: 0; background: #000; z-index: 9999;
+            display: flex; align-items: center; justify-content: center; flex-direction: column;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Loader -->
+    <div id="loader">
+        <div class="text-neon font-cyber text-2xl tracking-[0.5em] mb-4">INITIALIZING</div>
+        <div class="w-64 h-1 bg-gray-900 rounded overflow-hidden">
+            <div id="progress-bar" class="h-full bg-green-500 w-0 transition-all duration-200"></div>
+        </div>
+        <div class="mt-2 text-xs text-gray-500 font-mono">> Loading Assets...</div>
+    </div>
+
+    <!-- 3D Canvas Background -->
+    <div id="canvas-container"></div>
+
+    <!-- Navigation -->
+    <header class="fixed top-0 w-full p-6 z-50 flex justify-between items-center mix-blend-difference">
+        <div class="text-xl font-cyber font-bold text-white tracking-wider">VT <span class="text-neon text-xs">SYSTEM</span></div>
+        <div class="text-xs font-mono text-gray-400">
+            STATUS: <span class="text-neon animate-pulse">OPTIMAL</span>
+        </div>
+    </header>
+
+    <!-- Content Wrapper -->
+    <main class="relative w-full max-w-7xl mx-auto">
+
+        <!-- PAGE 1: HERO (Implied Content) -->
+        <section id="sec-hero" class="items-center text-center pointer-events-none">
+            <!-- 3D Text "VikingTrading" lives here in the canvas -->
+            <div class="absolute bottom-10 w-full animate-bounce">
+                <p class="text-xs text-gray-500 tracking-[0.3em]">SCROLL TO EXECUTE</p>
+            </div>
+        </section>
+
+        <!-- PAGE 2: IDENTITY (Kraken & Pure Alpha) -->
+        <section id="sec-identity" class="items-start">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 w-full">
+                <div class="glass-panel p-8 lg:p-12 rounded-sm transform transition-all duration-500 hover:translate-x-2">
+                    <div class="text-xs text-neon tracking-widest mb-4">/// IDENTITY_VERIFIED</div>
+                    <h2 class="text-4xl md:text-6xl font-cyber font-bold mb-6 text-white">MARKET<br>ARCHITECTS</h2>
+                    <p class="text-lg text-gray-300 mb-8 leading-relaxed">
+                        我们是 <span class="text-white font-bold border-b border-green-500">Kraken 最大的现货做市商</span>。
+                        在混沌的市场数据中寻找确定性。
+                    </p>
+                    <div class="space-y-4 font-mono text-sm text-gray-400">
+                        <div class="flex items-center">
+                            <span class="w-2 h-2 bg-green-500 mr-4 rounded-full"></span>
+                            无甲方，无乙方，只对 PnL 负责
+                        </div>
+                        <div class="flex items-center">
+                            <span class="w-2 h-2 bg-green-500 mr-4 rounded-full"></span>
+                            纯粹依靠交易盈利 (Pure Alpha)
+                        </div>
+                        <div class="flex items-center">
+                            <span class="w-2 h-2 bg-green-500 mr-4 rounded-full"></span>
+                            全自动高频策略
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- PAGE 3: THE PROTOCOL (Backtest Driven) -->
+        <section id="sec-protocol" class="items-center justify-center">
+            <div class="w-full max-w-5xl">
+                <div class="text-center mb-16">
+                    <h2 class="text-4xl font-cyber font-bold glitch" data-text="THE IRON LAW">THE IRON LAW</h2>
+                    <p class="text-gray-500 mt-2 tracking-wider">> "没有回测的研究 = 不存在"</p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8 relative">
+                    <!-- Center Line Graphic -->
+                    <div class="hidden md:block absolute left-1/2 top-0 bottom-0 w-px bg-gradient-to-b from-transparent via-green-500 to-transparent -translate-x-1/2"></div>
+
+                    <!-- Researcher Side -->
+                    <div class="glass-panel p-8 border-l-0 border-r-2 border-green-500/30 text-right hover:bg-white/5 transition-colors">
+                        <h3 class="text-2xl font-bold text-white mb-2">👨‍🔬 RESEARCHER</h3>
+                        <p class="text-xs text-gray-400 mb-6">ABSOLUTE FREEDOM</p>
+                        <ul class="space-y-4 text-sm text-gray-300">
+                            <li>"想法你说了算，方法不限"</li>
+                            <li>"不用管别人怎么做"</li>
+                            <li class="text-neon font-bold">"证明给我看"</li>
+                        </ul>
+                    </div>
+
+                    <!-- Company Side -->
+                    <div class="glass-panel p-8 border-r-0 border-l-2 border-cyan-500/30 text-left hover:bg-white/5 transition-colors">
+                        <h3 class="text-2xl font-bold text-white mb-2">🏢 SYSTEM</h3>
+                        <p class="text-xs text-gray-400 mb-6">RUTHLESS EFFICIENCY</p>
+                        <ul class="space-y-4 text-sm text-gray-300">
+                            <li>"只维护基建、计时器、成绩单"</li>
+                            <li>"技术细节？不管"</li>
+                            <li class="text-cyan font-bold">"赚钱了吗？数据说话"</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="mt-12 text-center">
+                    <div class="inline-block px-6 py-2 border border-gray-700 rounded bg-black text-xs font-mono">
+                        <span class="text-gray-500">METRIC:</span> 
+                        <span class="text-white">BASELINE_PnL</span> 
+                        <span class="text-neon mx-2">></span> 
+                        <span class="text-white">YOUR_STRATEGY</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- PAGE 4: SYSTEM (KRM) -->
+        <section id="sec-system" class="justify-center pb-20">
+            <div class="flex flex-col md:flex-row items-center gap-12">
+                
+                <div class="w-full md:w-1/2 space-y-6">
+                    <div class="text-xs text-cyan tracking-[0.2em]">/// KNOWLEDGE_MANAGEMENT</div>
+                    <h2 class="text-4xl md:text-5xl font-cyber font-bold">DAILY TASK <br>→ DEMO SCRIPT</h2>
+                    <p class="text-gray-400 leading-relaxed">
+                        拒绝 "Local Knowledge"。任何研究如果不产出可独立运行的资产，就是浪费。
+                        我们统一知识的最小单元：一份 Self-Contained 的代码。
+                    </p>
+                    <div class="pt-4">
+                        <div class="text-sm font-bold text-white mb-2">WHY?</div>
+                        <p class="text-xs text-gray-500 font-mono border-l-2 border-gray-700 pl-4">
+                            1. 消除隐形知识依赖<br>
+                            2. AI 辅助衍生的标准化语境<br>
+                            3. 研究即资产，而非消耗品
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Code Visual -->
+                <div class="w-full md:w-1/2">
+                    <div class="glass-panel p-1 rounded-md">
+                        <div class="flex items-center px-4 py-2 bg-black/50 border-b border-gray-800 gap-2">
+                            <div class="w-3 h-3 rounded-full bg-red-500"></div>
+                            <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+                            <div class="w-3 h-3 rounded-full bg-green-500"></div>
+                            <span class="ml-2 text-xs text-gray-500 font-mono">demo_task.py</span>
+                        </div>
+                        <div class="code-block p-6 font-mono text-xs md:text-sm overflow-hidden relative">
+                            <div class="absolute top-0 right-0 p-2 text-gray-700 select-none">AI_CONTEXT_READY</div>
+                            <span class="text-purple-400">import</span> viking_core <span class="text-purple-400">as</span> vk<br><br>
+                            <span class="text-gray-500"># Self-contained logic</span><br>
+                            <span class="text-blue-400">def</span> <span class="text-yellow-400">run_research_demo</span>():<br>
+                            &nbsp;&nbsp;data = vk.fetch(<span class="text-green-400">'KRAKEN_SPOT'</span>)<br>
+                            &nbsp;&nbsp;signal = vk.backtest(strategy_A, data)<br>
+                            &nbsp;&nbsp;<br>
+                            &nbsp;&nbsp;<span class="text-purple-400">if</span> signal.pnl > baseline:<br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;<span class="text-cyan-400">print</span>(<span class="text-green-400">"ALPHA DETECTED"</span>)<br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;vk.deploy(signal)<br><br>
+                            <span class="text-gray-500"># Execute without external deps</span><br>
+                            <span class="text-purple-400">if</span> __name__ == <span class="text-green-400">"__main__"</span>:<br>
+                            &nbsp;&nbsp;run_research_demo()<br>
+                            <span class="text-green-500 animate-pulse">_</span>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="border-t border-gray-900 bg-black py-8 text-center">
+            <p class="text-xs text-gray-600 font-mono">
+                © 2025 VIKING TRADING. <span class="text-gray-800">|</span> DATA IS OXYGEN.
+            </p>
+        </footer>
+
+    </main>
+
+    <!-- Three.js Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/FontLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/geometries/TextGeometry.js"></script>
+
+    <script>
+        // --- THREE.JS SETUP ---
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x000000, 0.002); // Deep fog
+
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.z = 30;
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+        // --- LIGHTS ---
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
+        scene.add(ambientLight);
+
+        const greenSpot = new THREE.SpotLight(0x00ff41, 2);
+        greenSpot.position.set(20, 20, 20);
+        scene.add(greenSpot);
+
+        const blueSpot = new THREE.SpotLight(0x00f3ff, 2);
+        blueSpot.position.set(-20, -10, 10);
+        scene.add(blueSpot);
+
+        // --- OBJECTS ---
+        
+        // 1. The "Matrix" Rain (Background)
+        const rainCount = 1500;
+        const rainGeo = new THREE.BufferGeometry();
+        const rainPos = new Float32Array(rainCount * 3);
+        const rainSpeed = new Float32Array(rainCount);
+
+        for(let i=0; i<rainCount; i++) {
+            rainPos[i*3] = (Math.random() - 0.5) * 200;     // X
+            rainPos[i*3+1] = (Math.random() - 0.5) * 200;   // Y
+            rainPos[i*3+2] = (Math.random() - 0.5) * 100 - 20; // Z
+            rainSpeed[i] = Math.random() * 0.2 + 0.05;
+        }
+        rainGeo.setAttribute('position', new THREE.BufferAttribute(rainPos, 3));
+        const rainMat = new THREE.PointsMaterial({
+            color: 0x00aa00,
+            size: 0.4,
+            transparent: true,
+            opacity: 0.6
+        });
+        const rainSystem = new THREE.Points(rainGeo, rainMat);
+        scene.add(rainSystem);
+
+        // 2. The Core (Globe/Sphere) - NOW ADDED IMMEDIATELY TO BE VISIBLE
+        const coreGroup = new THREE.Group();
+        scene.add(coreGroup);
+        // Set Initial Position closer to camera so it's visible in Hero section
+        coreGroup.position.set(0, 0, -15);
+
+        // Icosahedron Wireframe
+        const geoIco = new THREE.IcosahedronGeometry(10, 2);
+        const matWire = new THREE.MeshBasicMaterial({ color: 0x0044aa, wireframe: true, transparent: true, opacity: 0.15 });
+        const globeWire = new THREE.Mesh(geoIco, matWire);
+        coreGroup.add(globeWire);
+
+        // Particle Shell
+        const ptsGeo = new THREE.BufferGeometry();
+        const ptsCount = 800;
+        const ptsPos = new Float32Array(ptsCount * 3);
+        for(let i=0; i<ptsCount*3; i++) {
+            ptsPos[i] = (Math.random() - 0.5) * 22;
+        }
+        ptsGeo.setAttribute('position', new THREE.BufferAttribute(ptsPos, 3));
+        const ptsMat = new THREE.PointsMaterial({ color: 0x00ff41, size: 0.15 });
+        const globePts = new THREE.Points(ptsGeo, ptsMat);
+        coreGroup.add(globePts);
+
+        // 3. Floating Text (The "VikingTrading" Logo)
+        let textGroup = new THREE.Group();
+        scene.add(textGroup);
+        
+        const fontLoader = new THREE.FontLoader();
+        // Using UNPKG for a more reliable font source
+        fontLoader.load('https://cdn.jsdelivr.net/npm/three@0.128.0/examples/fonts/helvetiker_bold.typeface.json', (font) => {
+            const textGeo = new THREE.TextGeometry('VikingTrading', {
+                font: font, size: 3.5, height: 0.5,
+                curveSegments: 6, bevelEnabled: true, bevelThickness: 0.05, bevelSize: 0.05, bevelSegments: 3
+            });
+            textGeo.center();
+
+            // Dual Material: Solid inside, wireframe glow outside
+            const matSolid = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3, metalness: 0.8 });
+            const textMesh = new THREE.Mesh(textGeo, matSolid);
+            
+            const matEdge = new THREE.LineBasicMaterial({ color: 0x00ff41, transparent: true, opacity: 0.4 });
+            const edgeGeo = new THREE.WireframeGeometry(textGeo);
+            const wireMesh = new THREE.LineSegments(edgeGeo, matEdge);
+
+            textGroup.add(textMesh);
+            textGroup.add(wireMesh);
+
+            // Hide loader and start animations
+            gsap.to('#loader', { opacity: 0, duration: 1, onComplete: () => {
+                const loader = document.getElementById('loader');
+                if(loader) loader.remove();
+            }});
+            
+            // We call timeline init here to ensure text is ready for animation
+            initScrollTimeline();
+        }, 
+        // Progress
+        (xhr) => {
+             const percent = (xhr.loaded / xhr.total) * 100;
+             const bar = document.getElementById('progress-bar');
+             if(bar) bar.style.width = `${percent}%`;
+        },
+        // Error Handling
+        (err) => {
+            console.error("Font load failed", err);
+            // Force remove loader if font fails so site is still usable
+            gsap.to('#loader', { opacity: 0, duration: 1, onComplete: () => {
+                 const loader = document.getElementById('loader');
+                 if(loader) loader.remove();
+            }});
+            // Still init timeline for the core object
+            initScrollTimeline();
+        });
+
+        // --- ANIMATION LOOP ---
+        const clock = new THREE.Clock();
+        let mouseX = 0, mouseY = 0;
+
+        window.addEventListener('mousemove', (e) => {
+            mouseX = (e.clientX / window.innerWidth) * 2 - 1;
+            mouseY = -(e.clientY / window.innerHeight) * 2 + 1;
+        });
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const t = clock.getElapsedTime();
+
+            // Rain Fall
+            const positions = rainSystem.geometry.attributes.position.array;
+            for(let i=0; i<rainCount; i++) {
+                positions[i*3+1] -= rainSpeed[i];
+                if(positions[i*3+1] < -100) positions[i*3+1] = 100;
+            }
+            rainSystem.geometry.attributes.position.needsUpdate = true;
+
+            // Text Float
+            if(textGroup.visible) {
+                textGroup.rotation.x = mouseY * 0.05;
+                textGroup.rotation.y = mouseX * 0.05;
+                textGroup.position.y += Math.sin(t) * 0.005; // subtle bobbing
+            }
+
+            // Core Rotate
+            coreGroup.rotation.y += 0.002;
+            coreGroup.rotation.z = Math.sin(t * 0.2) * 0.1;
+
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        // --- GSAP SCROLLTIMELINE ---
+        function initScrollTimeline() {
+            gsap.registerPlugin(ScrollTrigger);
+            
+            const tl = gsap.timeline({
+                scrollTrigger: {
+                    trigger: "body",
+                    start: "top top",
+                    end: "bottom bottom",
+                    scrub: 1.5
+                }
+            });
+
+            // --- PHASE 1: Hero to Identity (Hide Text, Move Core) ---
+            // 1. Text flies up and vanishes
+            if(textGroup.children.length > 0) {
+                tl.to(textGroup.position, { y: 50, duration: 2 }, 0); 
+                tl.to(textGroup.rotation, { x: -1, duration: 2 }, 0);
+                tl.to(textGroup.scale, { x: 0, y: 0, z: 0, duration: 1 }, 0.5); 
+                tl.call(() => { textGroup.visible = false; }, null, 2); 
+            }
+
+            // 2. Core Animation from Start (z: -15) to Identity Section
+            // We want it to move back slightly then come forward or shift side
+            tl.fromTo(coreGroup.position, 
+                { z: -15, x: 0 }, // Start visible behind text
+                { z: -5, x: 10, duration: 3 }, 0 // Move to side for next section
+            );
+
+            // --- PHASE 2: Identity to Protocol (Core becomes structure) ---
+            // Rotate core faster
+            tl.to(coreGroup.rotation, { y: 5, duration: 3 }, 2);
+            tl.to(coreGroup.position, { x: 0, duration: 3 }, 2); // Move to center
+            
+            // Move camera "into" the rain
+            tl.to(camera.position, { z: 15, duration: 3 }, 2);
+
+            // --- PHASE 3: Protocol to System (Final abstract state) ---
+            // Move core to represent a "node"
+            tl.to(coreGroup.scale, { x: 0.5, y: 0.5, z: 0.5, duration: 3 }, 5);
+            tl.to(coreGroup.position, { y: 5, duration: 3 }, 5);
+            
+            // Rain gets intense
+            tl.to(rainMat, { opacity: 0.2, duration: 3 }, 5);
+        }
+
+        // Resize Handler
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+    </script>
+</body>
+</html>

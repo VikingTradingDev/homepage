@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VikingTrading | The Kraken's Engine</title>
+    <style>
+        :root {
+            --apple-bg: #000000;
+            --apple-text: #f5f5f7;
+            --mario-red: #ff3b30;
+            --mario-green: #34c759;
+            --mario-gold: #ffcc00;
+            --glass: rgba(255, 255, 255, 0.05);
+            --border: rgba(255, 255, 255, 0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            background-color: var(--apple-bg);
+            color: var(--apple-text);
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* Loader */
+        #loader {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #000;
+            z-index: 9999;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: opacity 1s ease;
+        }
+        
+        .loader-text {
+            font-size: 1.5rem;
+            font-weight: 300;
+            letter-spacing: 2px;
+            background: linear-gradient(90deg, var(--mario-red), var(--mario-gold));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: pulse 2s infinite;
+        }
+
+        /* Canvas Container for Three.js */
+        #canvas-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100vh;
+            z-index: 1;
+            pointer-events: none; /* Allow scrolling through canvas */
+        }
+
+        /* Main Scroll Content */
+        main {
+            position: relative;
+            z-index: 2;
+            width: 100%;
+        }
+
+        .scroll-spacer {
+            height: 100vh; /* Full screen spacer for the 3D text moment */
+        }
+
+        .content-wrapper {
+            background: linear-gradient(to bottom, transparent, #000 20%);
+            min-height: 200vh;
+            padding: 4rem 2rem;
+            opacity: 0; /* Controlled by GSAP */
+        }
+
+        /* Typography & Layout */
+        .hero-statement {
+            max-width: 1200px;
+            margin: 0 auto 150px auto;
+            text-align: center;
+        }
+
+        h2 {
+            font-size: clamp(2.5rem, 5vw, 5rem);
+            font-weight: 700;
+            line-height: 1.1;
+            margin-bottom: 2rem;
+            background: linear-gradient(180deg, #fff, #888);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        p.subtitle {
+            font-size: clamp(1.2rem, 2vw, 1.8rem);
+            color: #86868b;
+            font-weight: 400;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        /* Bento Grid (Apple Style + Mario Logic) */
+        .bento-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .bento-card {
+            background: var(--glass);
+            border: 1px solid var(--border);
+            border-radius: 30px;
+            padding: 40px;
+            backdrop-filter: blur(20px);
+            transition: transform 0.3s ease, border-color 0.3s ease;
+            position: relative;
+            overflow: hidden;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .bento-card:hover {
+            transform: scale(1.02);
+            border-color: var(--mario-green);
+        }
+
+        .bento-card.wide {
+            grid-column: span 2;
+        }
+
+        @media (max-width: 768px) {
+            .bento-card.wide { grid-column: span 1; }
+        }
+
+        .card-icon {
+            font-size: 3rem;
+            margin-bottom: 20px;
+            background: linear-gradient(135deg, var(--mario-red), var(--mario-gold));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .card-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #fff;
+        }
+
+        .card-desc {
+            font-size: 1rem;
+            color: #a1a1a6;
+            line-height: 1.6;
+        }
+
+        /* Floating Elements Decor */
+        .coin-glow {
+            position: absolute;
+            width: 200px;
+            height: 200px;
+            background: radial-gradient(circle, rgba(255,204,0,0.15) 0%, rgba(0,0,0,0) 70%);
+            top: -50px;
+            right: -50px;
+            pointer-events: none;
+        }
+
+        /* Footer */
+        footer {
+            margin-top: 150px;
+            padding: 50px 0;
+            text-align: center;
+            border-top: 1px solid var(--border);
+            color: #86868b;
+            font-size: 0.9rem;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 0.5; }
+            50% { opacity: 1; }
+            100% { opacity: 0.5; }
+        }
+        
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #000;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #333;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--mario-red);
+        }
+
+    </style>
+</head>
+<body>
+
+    <div id="loader">
+        <div class="loader-text">LOADING LEVEL 1-1...</div>
+    </div>
+
+    <div id="canvas-container"></div>
+
+    <main>
+        <div class="scroll-spacer"></div>
+
+        <div class="content-wrapper">
+            
+            <div class="hero-statement">
+                <h2>Powering the Kraken.</h2>
+                <p class="subtitle">我们不在游戏中，我们就是游戏引擎。<br>Kraken 交易所最大的现货做市商。</p>
+            </div>
+
+            <div class="bento-grid">
+                <div class="bento-card wide">
+                    <div class="coin-glow"></div>
+                    <div class="card-icon">♔</div> <div>
+                        <h3 class="card-title">Spot Market Dominance</h3>
+                        <p class="card-desc">在 Kraken 生态系统中提供无与伦比的流动性。我们的算法像精密管道一样处理数以亿计的数据点，确保市场平滑运行。</p>
+                    </div>
+                </div>
+
+                <div class="bento-card">
+                    <div class="card-icon">✕</div> <div>
+                        <h3 class="card-title">No Clients.</h3>
+                        <p class="card-desc">零甲方，零乙方。我们不为他人理财，我们只用自己的资本，在绝对的风险控制下博弈。</p>
+                    </div>
+                </div>
+
+                <div class="bento-card">
+                    <div class="card-icon">⚡</div>
+                    <div>
+                        <h3 class="card-title">Pure Tech</h3>
+                        <p class="card-desc">策略即核心。从微秒级的低延迟交易到宏观趋势捕捉，代码是我们唯一的武器。</p>
+                    </div>
+                </div>
+
+                <div class="bento-card wide" style="border-color: var(--mario-red);">
+                    <div class="card-icon">🍄</div>
+                    <div>
+                        <h3 class="card-title">Level Up Your Career</h3>
+                        <p class="card-desc">如果你厌倦了传统金融的繁文缛节，欢迎来到这个纯粹的竞技场。这里只有胜负，没有办公室政治。</p>
+                    </div>
+                </div>
+            </div>
+
+            <footer>
+                <p>&copy; 2024 VikingTrading. Press Start to Continue.</p>
+            </footer>
+        </div>
+    </main>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+
+    <script>
+        // --- Configuration ---
+        const CONFIG = {
+            text: "VikingTrading",
+            color: 0xFFCC00, // Mario Coin Gold
+            bgColor: 0x000000
+        };
+
+        // --- Three.js Setup ---
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(CONFIG.bgColor);
+        scene.fog = new THREE.FogExp2(CONFIG.bgColor, 0.02);
+
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.z = 30;
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        container.appendChild(renderer.domElement);
+
+        // --- Lights ---
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+        scene.add(ambientLight);
+
+        const pointLight = new THREE.PointLight(0xff3b30, 2, 100); // Mario Red Light
+        pointLight.position.set(10, 10, 10);
+        scene.add(pointLight);
+
+        const pointLight2 = new THREE.PointLight(0x34c759, 2, 100); // Mario Pipe Green Light
+        pointLight2.position.set(-10, -10, 10);
+        scene.add(pointLight2);
+
+        // --- Objects Group ---
+        const mainGroup = new THREE.Group();
+        scene.add(mainGroup);
+
+        // --- Load Font & Create Text ---
+        const loader = new THREE.FontLoader();
+        // Using a standard Three.js font from CDN
+        loader.load('https://threejs.org/examples/fonts/helvetiker_bold.typeface.json', function (font) {
+            
+            // 1. The Text
+            const textGeo = new THREE.TextGeometry(CONFIG.text, {
+                font: font,
+                size: 5,
+                height: 1,
+                curveSegments: 12,
+                bevelEnabled: true,
+                bevelThickness: 0.1,
+                bevelSize: 0.1,
+                bevelOffset: 0,
+                bevelSegments: 5
+            });
+
+            textGeo.computeBoundingBox();
+            const centerOffset = - 0.5 * (textGeo.boundingBox.max.x - textGeo.boundingBox.min.x);
+            textGeo.translate(centerOffset, 0, 0);
+
+            const textMaterial = new THREE.MeshStandardMaterial({ 
+                color: CONFIG.color,
+                roughness: 0.3,
+                metalness: 0.8,
+                emissive: 0xaa7700,
+                emissiveIntensity: 0.2
+            });
+            
+            const textMesh = new THREE.Mesh(textGeo, textMaterial);
+            mainGroup.add(textMesh);
+
+            // 2. The "Particles" (Abstract Pixels/Coins)
+            const geometry = new THREE.BoxGeometry(0.5, 0.5, 0.5);
+            const material = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.6 });
+
+            for (let i = 0; i < 200; i++) {
+                const mesh = new THREE.Mesh(geometry, material);
+                mesh.position.x = (Math.random() - 0.5) * 100;
+                mesh.position.y = (Math.random() - 0.5) * 100;
+                mesh.position.z = (Math.random() - 0.5) * 50 - 10;
+                mesh.rotation.x = Math.random() * Math.PI;
+                mesh.rotation.y = Math.random() * Math.PI;
+                
+                // Random colors: Gold, Red, Green
+                const rand = Math.random();
+                if(rand > 0.6) mesh.material = new THREE.MeshBasicMaterial({color: 0xff3b30}); // Red
+                else if(rand > 0.3) mesh.material = new THREE.MeshBasicMaterial({color: 0x34c759}); // Green
+                else mesh.material = new THREE.MeshBasicMaterial({color: 0xffd700}); // Gold
+
+                mainGroup.add(mesh);
+            }
+
+            // Remove Loader
+            document.getElementById('loader').style.opacity = '0';
+            setTimeout(() => document.getElementById('loader').remove(), 1000);
+            
+            initScrollAnimations(textMesh);
+        });
+
+        // --- Animation Loop ---
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            // Subtle idle rotation
+            mainGroup.rotation.y += 0.002;
+            mainGroup.rotation.x = Math.sin(Date.now() * 0.001) * 0.05;
+
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        // --- Resize Handler ---
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // --- GSAP Scroll Interactions ---
+        gsap.registerPlugin(ScrollTrigger);
+
+        function initScrollAnimations(textMesh) {
+            // 1. The 3D Text Explosion/Fade
+            const tl = gsap.timeline({
+                scrollTrigger: {
+                    trigger: "body",
+                    start: "top top",
+                    end: "100vh", // Trigger over the first viewport height
+                    scrub: 1,
+                }
+            });
+
+            // Move camera back
+            tl.to(camera.position, { z: 100, ease: "power1.inOut" }, 0);
+            
+            // Rotate text violently then fade
+            tl.to(textMesh.rotation, { x: Math.PI * 2, y: Math.PI, ease: "power1.inOut" }, 0);
+            tl.to(mainGroup.position, { y: 50, ease: "power1.in" }, 0);
+            tl.to(container, { opacity: 0, ease: "power1.out" }, 0.5); // Fade out canvas half way
+
+            // 2. Content Reveal
+            gsap.to(".content-wrapper", {
+                scrollTrigger: {
+                    trigger: ".scroll-spacer",
+                    start: "center center",
+                    end: "bottom center",
+                    scrub: true
+                },
+                opacity: 1,
+                y: -50
+            });
+
+            // 3. Bento Cards Animation (Staggered entry)
+            gsap.utils.toArray(".bento-card").forEach((card, i) => {
+                gsap.from(card, {
+                    scrollTrigger: {
+                        trigger: card,
+                        start: "top 90%",
+                    },
+                    y: 100,
+                    opacity: 0,
+                    duration: 1,
+                    ease: "power3.out",
+                    delay: i * 0.1
+                });
+            });
+        }
+
+    </script>
+</body>
+</html>
